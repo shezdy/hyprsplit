@@ -1,0 +1,11 @@
+[repository]
+name = "hyprsplit"
+authors = ["shezdy"]
+
+[hyprsplit]
+description ="split monitor workspaces"
+authors = ["shezdy"]
+output = "hyprsplit.so"
+build = [
+    "make all",
+]
