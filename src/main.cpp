@@ -1,15 +1,50 @@
 #include "globals.hpp"
 
 std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
-    int wsID = 0;
-    try {
-        wsID = std::stoi(workspace);
-    } catch (std::invalid_argument&) { return workspace; }
+    if (!g_pCompositor->m_pLastMonitor) {
+        Debug::log(ERR, "[hyprsplit] no monitor in getWorkspaceOnCurrentMonitor?");
+        return workspace;
+    }
 
+    int                wsID          = 1;
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
 
-    if (wsID <= 0 || wsID > **NUMWORKSPACES || !g_pCompositor->m_pLastMonitor)
+    if (isNumber(workspace)) {
+        wsID = std::max(std::stoi(workspace), 1);
+    } else if (workspace[0] == '+' || workspace[0] == '-') {
+        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, g_pCompositor->m_pLastMonitor->activeWorkspace);
+
+        if (!PLUSMINUSRESULT.has_value())
+            return workspace;
+
+        wsID = std::max((int)PLUSMINUSRESULT.value(), 1);
+    } else if (workspace[0] == 'r' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
+        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), g_pCompositor->m_pLastMonitor->activeWorkspace);
+
+        if (!PLUSMINUSRESULT.has_value())
+            return workspace;
+
+        wsID = std::max((int)PLUSMINUSRESULT.value(), 1);
+    } else if (workspace[0] == 'e' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
+        return "m" + workspace.substr(1);
+    } else if (workspace.starts_with("empty")) {
+        int i = 0;
+        while (++i <= **NUMWORKSPACES) {
+            const int  id         = g_pCompositor->m_pLastMonitor->ID * (**NUMWORKSPACES) + i;
+            const auto PWORKSPACE = g_pCompositor->getWorkspaceByID(id);
+
+            if (!PWORKSPACE || (g_pCompositor->getWindowsOnWorkspace(id) == 0))
+                return std::to_string(i);
+        }
+
+        Debug::log(LOG, "[hyprsplit] no empty workspace on monitor");
+        return std::to_string(g_pCompositor->m_pLastMonitor->activeWorkspace);
+    } else {
         return workspace;
+    }
+
+    if (wsID > **NUMWORKSPACES)
+        wsID = ((wsID - 1) % **NUMWORKSPACES) + 1;
 
     return std::to_string(g_pCompositor->m_pLastMonitor->ID * (**NUMWORKSPACES) + wsID);
 }
