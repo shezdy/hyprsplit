@@ -7,6 +7,8 @@ A complete rewrite of [split-monitor-workspaces](https://github.com/Duckonaut/sp
 - Dispatcher to swap all windows in active workspaces between two monitors
 
 ## Installation
+Requires Hyprland version >=`v0.36.0`
+
 ### Hyprpm
 ```
 hyprpm update
