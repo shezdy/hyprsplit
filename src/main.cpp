@@ -12,19 +12,25 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     if (isNumber(workspace)) {
         wsID = std::max(std::stoi(workspace), 1);
     } else if (workspace[0] == '+' || workspace[0] == '-') {
-        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, g_pCompositor->m_pLastMonitor->activeWorkspace);
+        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, ((g_pCompositor->m_pLastMonitor->activeWorkspace - 1) % **NUMWORKSPACES) + 1) ;
 
         if (!PLUSMINUSRESULT.has_value())
             return workspace;
 
         wsID = std::max((int)PLUSMINUSRESULT.value(), 1);
+        
+        if (wsID > **NUMWORKSPACES)
+            wsID = **NUMWORKSPACES;
     } else if (workspace[0] == 'r' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
         const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), g_pCompositor->m_pLastMonitor->activeWorkspace);
 
         if (!PLUSMINUSRESULT.has_value())
             return workspace;
 
-        wsID = std::max((int)PLUSMINUSRESULT.value(), 1);
+        wsID = (int)PLUSMINUSRESULT.value();
+
+        if (wsID <= 0)
+            wsID = ((((wsID - 1) % **NUMWORKSPACES) + **NUMWORKSPACES) % **NUMWORKSPACES) + 1;
     } else if (workspace[0] == 'e' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
         return "m" + workspace.substr(1);
     } else if (workspace.starts_with("empty")) {
