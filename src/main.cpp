@@ -12,13 +12,13 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     if (isNumber(workspace)) {
         wsID = std::max(std::stoi(workspace), 1);
     } else if (workspace[0] == '+' || workspace[0] == '-') {
-        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, ((g_pCompositor->m_pLastMonitor->activeWorkspace - 1) % **NUMWORKSPACES) + 1) ;
+        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, ((g_pCompositor->m_pLastMonitor->activeWorkspace - 1) % **NUMWORKSPACES) + 1);
 
         if (!PLUSMINUSRESULT.has_value())
             return workspace;
 
         wsID = std::max((int)PLUSMINUSRESULT.value(), 1);
-        
+
         if (wsID > **NUMWORKSPACES)
             wsID = **NUMWORKSPACES;
     } else if (workspace[0] == 'r' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
@@ -40,7 +40,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
             const auto PWORKSPACE = g_pCompositor->getWorkspaceByID(id);
 
             if (!PWORKSPACE || (g_pCompositor->getWindowsOnWorkspace(id) == 0))
-                return std::to_string(i);
+                return std::to_string(id);
         }
 
         Debug::log(LOG, "[hyprsplit] no empty workspace on monitor");
