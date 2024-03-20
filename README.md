@@ -5,6 +5,7 @@ A complete rewrite of [split-monitor-workspaces](https://github.com/Duckonaut/sp
 - Workspaces on each monitor are determined by that monitor's ID
 - Ability to grab windows that get lost in invalid workspaces when disconnecting monitors
 - Dispatcher to swap all windows in active workspaces between two monitors
+- Better handling of workspace params. For example `empty` will work properly and select an empty workspace on the current monitor.
 
 ## Installation
 Requires Hyprland version >=`v0.36.0`
