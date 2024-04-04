@@ -12,7 +12,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     if (isNumber(workspace)) {
         wsID = std::max(std::stoi(workspace), 1);
     } else if (workspace[0] == '+' || workspace[0] == '-') {
-        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, ((g_pCompositor->m_pLastMonitor->activeWorkspace - 1) % **NUMWORKSPACES) + 1);
+        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, ((g_pCompositor->m_pLastMonitor->activeWorkspaceID() - 1) % **NUMWORKSPACES) + 1);
 
         if (!PLUSMINUSRESULT.has_value())
             return workspace;
@@ -22,7 +22,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
         if (wsID > **NUMWORKSPACES)
             wsID = **NUMWORKSPACES;
     } else if (workspace[0] == 'r' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
-        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), g_pCompositor->m_pLastMonitor->activeWorkspace);
+        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), g_pCompositor->m_pLastMonitor->activeWorkspaceID());
 
         if (!PLUSMINUSRESULT.has_value())
             return workspace;
@@ -44,7 +44,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
         }
 
         Debug::log(LOG, "[hyprsplit] no empty workspace on monitor");
-        return std::to_string(g_pCompositor->m_pLastMonitor->activeWorkspace);
+        return std::to_string(g_pCompositor->m_pLastMonitor->activeWorkspaceID());
     } else {
         return workspace;
     }
@@ -68,8 +68,8 @@ void ensureGoodWorkspaces() {
         const int MIN = m->ID * (**NUMWORKSPACES) + 1;
         const int MAX = (m->ID + 1) * (**NUMWORKSPACES);
 
-        if (m->activeWorkspace < MIN || m->activeWorkspace > MAX) {
-            Debug::log(LOG, "[hyprsplit] {} {} active workspace {} out of bounds, changing workspace to {}", m->szName, m->ID, m->activeWorkspace, MIN);
+        if (m->activeWorkspaceID() < MIN || m->activeWorkspaceID() > MAX) {
+            Debug::log(LOG, "[hyprsplit] {} {} active workspace {} out of bounds, changing workspace to {}", m->szName, m->ID, m->activeWorkspaceID(), MIN);
             auto ws = g_pCompositor->getWorkspaceByID(MIN);
 
             if (!ws) {
@@ -84,7 +84,7 @@ void ensureGoodWorkspaces() {
         for (auto& ws : g_pCompositor->m_vWorkspaces) {
             if (ws->m_iMonitorID != m->ID && ws->m_iID >= MIN && ws->m_iID <= MAX) {
                 Debug::log(LOG, "[hyprsplit] workspace {} on monitor {} move to {} {}", ws->m_iID, ws->m_iMonitorID, m->szName, m->ID);
-                g_pCompositor->moveWorkspaceToMonitor(ws.get(), m.get());
+                g_pCompositor->moveWorkspaceToMonitor(ws, m.get());
             }
         }
     }
@@ -151,8 +151,8 @@ void swapActiveWorkspaces(std::string args) {
     if (!PMON1 || !PMON2 || PMON1 == PMON2)
         return;
 
-    const auto PWORKSPACEA = g_pCompositor->getWorkspaceByID(PMON1->activeWorkspace);
-    const auto PWORKSPACEB = g_pCompositor->getWorkspaceByID(PMON2->activeWorkspace);
+    const auto PWORKSPACEA = PMON1->activeWorkspace;
+    const auto PWORKSPACEB = PMON2->activeWorkspace;
 
     if (!PWORKSPACEA || !PWORKSPACEB)
         return;
@@ -161,10 +161,10 @@ void swapActiveWorkspaces(std::string args) {
     std::vector<CWindow*> windowsB;
 
     for (auto& w : g_pCompositor->m_vWindows) {
-        if (w->m_iWorkspaceID == PWORKSPACEA->m_iID) {
+        if (w->workspaceID() == PWORKSPACEA->m_iID) {
             windowsA.push_back(w.get());
         }
-        if (w->m_iWorkspaceID == PWORKSPACEB->m_iID) {
+        if (w->workspaceID() == PWORKSPACEB->m_iID) {
             windowsB.push_back(w.get());
         }
     }
@@ -181,7 +181,7 @@ void swapActiveWorkspaces(std::string args) {
 }
 
 void grabRogueWindows(std::string args) {
-    const auto PWORKSPACE = g_pCompositor->getWorkspaceByID(g_pCompositor->m_pLastMonitor->activeWorkspace);
+    const auto PWORKSPACE = g_pCompositor->m_pLastMonitor->activeWorkspace;
 
     if (!PWORKSPACE) {
         Debug::log(ERR, "[hyprsplit] no active workspace?");
@@ -200,7 +200,7 @@ void grabRogueWindows(std::string args) {
             const int MIN = m->ID * (**NUMWORKSPACES) + 1;
             const int MAX = (m->ID + 1) * (**NUMWORKSPACES);
 
-            if (w->m_iWorkspaceID >= MIN && w->m_iWorkspaceID <= MAX && w->m_iWorkspaceID > 0) {
+            if (w->workspaceID() >= MIN && w->workspaceID() <= MAX && w->workspaceID() > 0) {
                 inGoodWorkspace = true;
                 break;
             }
