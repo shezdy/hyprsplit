@@ -20,7 +20,7 @@
         version = "0.1";
         src = ./.;
 
-        nativeBuildInputs = with pkgs; [pkg-config];
+        nativeBuildInputs = with pkgs; [pkg-config meson ninja];
         buildInputs = with pkgs;
           [
             hyprland.packages.${system}.hyprland.dev
@@ -28,15 +28,6 @@
             libdrm
           ]
           ++ hyprland.packages.${system}.hyprland.buildInputs;
-
-        installPhase = ''
-          runHook preInstall
-
-          mkdir -p $out/lib
-          mv hyprsplit.so $out/lib/libhyprsplit.so
-
-          runHook postInstall
-        '';
 
         meta = with pkgs.lib; {
           homepage = "https://github.com/shezdy/hyprsplit";
@@ -52,7 +43,11 @@
     devShells = eachSystem (system: let
       pkgs = pkgsFor.${system};
     in {
-      default = pkgs.gcc13Stdenv.mkShell {
+      default = pkgs.mkShell.override {stdenv = pkgs.gcc13Stdenv;} {
+        shellHook = ''
+          meson setup build --reconfigure
+          cp ./build/compile_commands.json ./compile_commands.json
+        '';
         name = "hyprsplit";
         inputsFrom = [self.packages.${system}.hyprsplit];
       };

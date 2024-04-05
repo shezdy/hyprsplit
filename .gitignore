@@ -1,3 +1,6 @@
 .vscode/
 hyprsplit.so
 result
+build
+compile_commands.json
+.cache
