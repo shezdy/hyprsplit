@@ -191,7 +191,7 @@ void grabRogueWindows(std::string args) {
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
 
     for (auto& w : g_pCompositor->m_vWindows) {
-        if (!w->m_bIsMapped)
+        if (!w->m_bIsMapped || w->onSpecialWorkspace())
             continue;
 
         bool inGoodWorkspace = false;
@@ -200,7 +200,7 @@ void grabRogueWindows(std::string args) {
             const int MIN = m->ID * (**NUMWORKSPACES) + 1;
             const int MAX = (m->ID + 1) * (**NUMWORKSPACES);
 
-            if (w->workspaceID() >= MIN && w->workspaceID() <= MAX && w->workspaceID() > 0) {
+            if (w->workspaceID() >= MIN && w->workspaceID() <= MAX) {
                 inGoodWorkspace = true;
                 break;
             }
