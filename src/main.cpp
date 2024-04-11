@@ -1,3 +1,5 @@
+#include <hyprland/src/Compositor.hpp>
+
 #include "globals.hpp"
 
 std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
