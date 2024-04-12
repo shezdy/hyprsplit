@@ -19,10 +19,14 @@ hyprpm enable hyprsplit
 
 ### Manual
 Make sure you have the Hyprland headers installed (see [hyprland wiki](https://wiki.hyprland.org/Plugins/Using-Plugins/#manual))
+
+If you are compiling for a numbered version of Hyprland, check for a commit pin in hyprpm.toml, and reset the plugin to the second hash in the pair.
+
+Compile the plugin:
 ```
 make all
 ```
-Then add the following to your config  `plugin = /path/to/hyprsplit/hyprsplit.so`
+Finally add the following to your config  `plugin = /path/to/hyprsplit/hyprsplit.so`, or run `hyprctl plugin load /path/to/hyprsplit/hyprsplit.so`
 
 ## Configuration
 ### Options
