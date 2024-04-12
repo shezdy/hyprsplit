@@ -11,6 +11,7 @@ A complete rewrite of [split-monitor-workspaces](https://github.com/Duckonaut/sp
 Requires Hyprland version >=`v0.36.0`
 
 ### Hyprpm
+Load plugins on startup by putting exec-once = hyprpm reload -n in your hyprland config.
 ```
 hyprpm update
 hyprpm add https://github.com/shezdy/hyprsplit
