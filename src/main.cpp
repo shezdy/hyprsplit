@@ -159,15 +159,15 @@ void swapActiveWorkspaces(std::string args) {
     if (!PWORKSPACEA || !PWORKSPACEB)
         return;
 
-    std::vector<CWindow*> windowsA;
-    std::vector<CWindow*> windowsB;
+    std::vector<PHLWINDOW> windowsA;
+    std::vector<PHLWINDOW> windowsB;
 
     for (auto& w : g_pCompositor->m_vWindows) {
         if (w->workspaceID() == PWORKSPACEA->m_iID) {
-            windowsA.push_back(w.get());
+            windowsA.push_back(w);
         }
         if (w->workspaceID() == PWORKSPACEB->m_iID) {
-            windowsB.push_back(w.get());
+            windowsB.push_back(w);
         }
     }
 
@@ -210,7 +210,7 @@ void grabRogueWindows(std::string args) {
 
         if (!inGoodWorkspace) {
             Debug::log(LOG, "[hyprsplit] moving window {} to workspace {}", w->m_szTitle, PWORKSPACE->m_iID);
-            const auto args = std::format("{},address:0x{:x}", PWORKSPACE->m_iID, w.get());
+            const auto args = std::format("{},address:0x{:x}", PWORKSPACE->m_iID, (uintptr_t)w.get());
             g_pKeybindManager->m_mDispatchers["movetoworkspacesilent"](args);
         }
     }
