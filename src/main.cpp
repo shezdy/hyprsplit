@@ -2,6 +2,9 @@
 
 #include "globals.hpp"
 
+std::unordered_map<int, int> g_mPreviousWorkspaces;
+//
+
 std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     if (!g_pCompositor->m_pLastMonitor) {
         Debug::log(ERR, "[hyprsplit] no monitor in getWorkspaceOnCurrentMonitor?");
@@ -47,6 +50,18 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
 
         Debug::log(LOG, "[hyprsplit] no empty workspace on monitor");
         return std::to_string(g_pCompositor->m_pLastMonitor->activeWorkspaceID());
+    } else if (workspace.starts_with("prev")) {
+        const auto ACTIVE = g_pCompositor->m_pLastMonitor->activeWorkspace;
+        const int  MIN    = g_pCompositor->m_pLastMonitor->ID * (**NUMWORKSPACES) + 1;
+        const int  MAX    = (g_pCompositor->m_pLastMonitor->ID + 1) * (**NUMWORKSPACES);
+
+        if (ACTIVE->m_sPrevWorkspace.iID >= MIN && ACTIVE->m_sPrevWorkspace.iID <= MAX)
+            return std::to_string(ACTIVE->m_sPrevWorkspace.iID);
+
+        if (g_mPreviousWorkspaces.contains(ACTIVE->m_iID))
+            return std::to_string(g_mPreviousWorkspaces[ACTIVE->m_iID]);
+
+        return std::to_string(ACTIVE->m_iID);
     } else {
         return workspace;
     }
@@ -222,6 +237,17 @@ void onMonitorAdded(CMonitor* pMonitor) {
     ensureGoodWorkspaces();
 }
 
+void onWorkspaceChanged(PHLWORKSPACE pWorkspace) {
+    static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
+    const int          MIN           = pWorkspace->m_iMonitorID * (**NUMWORKSPACES) + 1;
+    const int          MAX           = (pWorkspace->m_iMonitorID + 1) * (**NUMWORKSPACES);
+
+    if (pWorkspace->m_sPrevWorkspace.iID < MIN || pWorkspace->m_sPrevWorkspace.iID > MAX)
+        return;
+
+    g_mPreviousWorkspaces[pWorkspace->m_iID] = pWorkspace->m_sPrevWorkspace.iID;
+}
+
 // Do NOT change this function.
 APICALL EXPORT std::string PLUGIN_API_VERSION() {
     return HYPRLAND_API_VERSION;
@@ -251,6 +277,8 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         HyprlandAPI::registerCallbackDynamic(PHANDLE, "monitorAdded", [&](void* self, SCallbackInfo& info, std::any data) { onMonitorAdded(std::any_cast<CMonitor*>(data)); });
     static auto configReloadedHook =
         HyprlandAPI::registerCallbackDynamic(PHANDLE, "configReloaded", [&](void* self, SCallbackInfo& info, std::any data) { ensureGoodWorkspaces(); });
+    static auto workspaceHook =
+        HyprlandAPI::registerCallbackDynamic(PHANDLE, "workspace", [&](void* self, SCallbackInfo& info, std::any data) { onWorkspaceChanged(std::any_cast<PHLWORKSPACE>(data)); });
 
     HyprlandAPI::reloadConfig();
 
