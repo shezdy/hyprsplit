@@ -14,9 +14,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     int                wsID          = 1;
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
 
-    if (isNumber(workspace)) {
-        wsID = std::max(std::stoi(workspace), 1);
-    } else if (workspace[0] == '+' || workspace[0] == '-') {
+    if (workspace[0] == '+' || workspace[0] == '-') {
         const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, ((g_pCompositor->m_pLastMonitor->activeWorkspaceID() - 1) % **NUMWORKSPACES) + 1);
 
         if (!PLUSMINUSRESULT.has_value())
@@ -26,6 +24,8 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
 
         if (wsID > **NUMWORKSPACES)
             wsID = **NUMWORKSPACES;
+    } else if (isNumber(workspace)) {
+        wsID = std::max(std::stoi(workspace), 1);
     } else if (workspace[0] == 'r' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
         const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), g_pCompositor->m_pLastMonitor->activeWorkspaceID());
 
