@@ -1,6 +1,8 @@
-#include <hyprland/src/Compositor.hpp>
-
 #include "globals.hpp"
+#include <hyprland/src/Compositor.hpp>
+#include <hyprutils/string/String.hpp>
+
+using namespace Hyprutils::String;
 
 std::unordered_map<int, int> g_mPreviousWorkspaces;
 //
