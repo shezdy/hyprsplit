@@ -100,7 +100,9 @@ void ensureGoodWorkspaces() {
             m->changeWorkspace(ws, false, true, true);
         }
 
-        for (auto& ws : g_pCompositor->m_vWorkspaces) {
+        const auto WSSIZE = g_pCompositor->m_vWorkspaces.size();
+        for (size_t i = 0; i < WSSIZE; i++) {
+            const auto& ws = g_pCompositor->m_vWorkspaces[i];
             if (!valid(ws))
                 continue;
 
