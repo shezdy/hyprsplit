@@ -1,6 +1,10 @@
 #include "globals.hpp"
-#include <hyprland/src/Compositor.hpp>
+#include <hyprland/src/includes.hpp>
 #include <hyprutils/string/String.hpp>
+
+#define private public
+#include <hyprland/src/Compositor.hpp>
+#undef private
 
 using namespace Hyprutils::String;
 
@@ -162,30 +166,151 @@ void swapActiveWorkspaces(std::string args) {
     const auto PWORKSPACEA = PMON1->activeWorkspace;
     const auto PWORKSPACEB = PMON2->activeWorkspace;
 
-    if (!PWORKSPACEA || !PWORKSPACEB)
+    if (!PWORKSPACEA || !valid(PWORKSPACEA) || !PWORKSPACEB || !valid(PWORKSPACEB))
         return;
 
-    std::vector<PHLWINDOW> windowsA;
-    std::vector<PHLWINDOW> windowsB;
+    const auto LAYOUTNAME = g_pLayoutManager->m_vLayouts[g_pLayoutManager->m_iCurrentLayoutID].first;
 
-    for (auto& w : g_pCompositor->m_vWindows) {
-        if (w->workspaceID() == PWORKSPACEA->m_iID) {
-            windowsA.push_back(w);
+    // with known layouts, swap the workspaces between monitors, then fix the layout
+    // with an unknown layout (eg from a plugin) do a "dumb" swap by moving the windows between the workspaces.
+    if (LAYOUTNAME == "dwindle" || LAYOUTNAME == "master") {
+        // proceed as Hyprland normally would (see CCompositor::swapActiveWorkspaces)
+        PWORKSPACEA->m_iMonitorID = PMON2->ID;
+        PWORKSPACEA->moveToMonitor(PMON2->ID);
+
+        for (auto& w : g_pCompositor->m_vWindows) {
+            if (w->m_pWorkspace == PWORKSPACEA) {
+                if (w->m_bPinned) {
+                    w->m_pWorkspace = PWORKSPACEB;
+                    continue;
+                }
+
+                w->m_iMonitorID = PMON2->ID;
+
+                // additionally, move floating and fs windows manually
+                if (w->m_bIsFloating)
+                    w->m_vRealPosition = w->m_vRealPosition.goal() - PMON1->vecPosition + PMON2->vecPosition;
+
+                if (w->isFullscreen()) {
+                    w->m_vRealPosition = PMON2->vecPosition;
+                    w->m_vRealSize     = PMON2->vecSize;
+                }
+
+                w->updateToplevel();
+            }
         }
-        if (w->workspaceID() == PWORKSPACEB->m_iID) {
-            windowsB.push_back(w);
+
+        PWORKSPACEB->m_iMonitorID = PMON1->ID;
+        PWORKSPACEB->moveToMonitor(PMON1->ID);
+
+        for (auto& w : g_pCompositor->m_vWindows) {
+            if (w->m_pWorkspace == PWORKSPACEB) {
+                if (w->m_bPinned) {
+                    w->m_pWorkspace = PWORKSPACEA;
+                    continue;
+                }
+
+                w->m_iMonitorID = PMON1->ID;
+
+                // additionally, move floating and fs windows manually
+                if (w->m_bIsFloating)
+                    w->m_vRealPosition = w->m_vRealPosition.goal() - PMON2->vecPosition + PMON1->vecPosition;
+
+                if (w->isFullscreen()) {
+                    w->m_vRealPosition = PMON1->vecPosition;
+                    w->m_vRealSize     = PMON1->vecSize;
+                }
+
+                w->updateToplevel();
+            }
+        }
+
+        PMON1->activeWorkspace = PWORKSPACEB;
+        PMON2->activeWorkspace = PWORKSPACEA;
+
+        // swap workspace ids
+        const auto TMPID   = PWORKSPACEA->m_iID;
+        const auto TMPNAME = PWORKSPACEA->m_szName;
+        PWORKSPACEA->m_iID    = PWORKSPACEB->m_iID;
+        PWORKSPACEA->m_szName = PWORKSPACEB->m_szName;
+        PWORKSPACEB->m_iID    = TMPID;
+        PWORKSPACEB->m_szName = TMPNAME;
+
+        // swap previous workspaces
+        const auto TMPPREV                      = PWORKSPACEA->m_sPrevWorkspace;
+        const auto TMPPREVPERMONITOR            = PWORKSPACEA->m_sPrevWorkspacePerMonitor;
+        PWORKSPACEA->m_sPrevWorkspace           = PWORKSPACEB->m_sPrevWorkspace;
+        PWORKSPACEA->m_sPrevWorkspacePerMonitor = PWORKSPACEB->m_sPrevWorkspacePerMonitor;
+        PWORKSPACEB->m_sPrevWorkspace           = TMPPREV;
+        PWORKSPACEB->m_sPrevWorkspacePerMonitor = TMPPREVPERMONITOR;
+
+        // fix the layout nodes
+        if (LAYOUTNAME == "dwindle") {
+            const auto LAYOUT = (CHyprDwindleLayout*)g_pLayoutManager->getCurrentLayout();
+            for (auto& n : LAYOUT->m_lDwindleNodesData) {
+                if (n.workspaceID == PWORKSPACEA->m_iID)
+                    n.workspaceID = PWORKSPACEB->m_iID;
+                else if (n.workspaceID == PWORKSPACEB->m_iID)
+                    n.workspaceID = PWORKSPACEA->m_iID;
+            }
+        } else if (LAYOUTNAME == "master") {
+            const auto LAYOUT = (CHyprMasterLayout*)g_pLayoutManager->getCurrentLayout();
+            for (auto& n : LAYOUT->m_lMasterNodesData) {
+                if (n.workspaceID == PWORKSPACEA->m_iID)
+                    n.workspaceID = PWORKSPACEB->m_iID;
+                else if (n.workspaceID == PWORKSPACEB->m_iID)
+                    n.workspaceID = PWORKSPACEA->m_iID;
+            }
+
+            const auto WSDATAA = LAYOUT->getMasterWorkspaceData(PWORKSPACEA->m_iID);
+            const auto WSDATAB = LAYOUT->getMasterWorkspaceData(PWORKSPACEB->m_iID);
+
+            WSDATAA->workspaceID = PWORKSPACEB->m_iID;
+            WSDATAB->workspaceID = PWORKSPACEA->m_iID;
+        }
+
+        // recalc layout
+        g_pLayoutManager->getCurrentLayout()->recalculateMonitor(PMON1->ID);
+        g_pLayoutManager->getCurrentLayout()->recalculateMonitor(PMON2->ID);
+
+        g_pCompositor->updateFullscreenFadeOnWorkspace(PWORKSPACEA);
+        g_pCompositor->updateFullscreenFadeOnWorkspace(PWORKSPACEB);
+
+        // instead of moveworkspace events, we should send movewindow events
+        for (auto& w : g_pCompositor->m_vWindows) {
+            if (w->workspaceID() == PWORKSPACEA->m_iID) {
+                g_pEventManager->postEvent(SHyprIPCEvent{"movewindow", std::format("{:x},{}", (uintptr_t)w.get(), PWORKSPACEA->m_szName)});
+                g_pEventManager->postEvent(SHyprIPCEvent{"movewindowv2", std::format("{:x},{},{}", (uintptr_t)w.get(), PWORKSPACEA->m_iID, PWORKSPACEA->m_szName)});
+                EMIT_HOOK_EVENT("moveWindow", (std::vector<std::any>{w, PWORKSPACEA}));
+            } else if (w->workspaceID() == PWORKSPACEB->m_iID) {
+                g_pEventManager->postEvent(SHyprIPCEvent{"movewindow", std::format("{:x},{}", (uintptr_t)w.get(), PWORKSPACEB->m_szName)});
+                g_pEventManager->postEvent(SHyprIPCEvent{"movewindowv2", std::format("{:x},{},{}", (uintptr_t)w.get(), PWORKSPACEB->m_iID, PWORKSPACEB->m_szName)});
+                EMIT_HOOK_EVENT("moveWindow", (std::vector<std::any>{w, PWORKSPACEB}));
+            }
+        }
+    } else {
+        // unknown layout. move all windows without preserving layout
+        std::vector<PHLWINDOW> windowsA;
+        std::vector<PHLWINDOW> windowsB;
+
+        for (auto& w : g_pCompositor->m_vWindows) {
+            if (w->workspaceID() == PWORKSPACEA->m_iID) {
+                windowsA.push_back(w);
+            }
+            if (w->workspaceID() == PWORKSPACEB->m_iID) {
+                windowsB.push_back(w);
+            }
+        }
+
+        for (auto& w : windowsA) {
+            g_pCompositor->moveWindowToWorkspaceSafe(w, PWORKSPACEB);
+        }
+        for (auto& w : windowsB) {
+            g_pCompositor->moveWindowToWorkspaceSafe(w, PWORKSPACEA);
         }
     }
 
-    for (auto& w : windowsA) {
-        g_pCompositor->moveWindowToWorkspaceSafe(w, PWORKSPACEB);
-    }
-    for (auto& w : windowsB) {
-        g_pCompositor->moveWindowToWorkspaceSafe(w, PWORKSPACEA);
-    }
-
-    g_pCompositor->updateFullscreenFadeOnWorkspace(PWORKSPACEA);
-    g_pCompositor->updateFullscreenFadeOnWorkspace(PWORKSPACEB);
+    g_pInputManager->refocus();
 }
 
 void grabRogueWindows(std::string args) {
