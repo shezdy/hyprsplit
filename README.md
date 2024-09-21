@@ -35,6 +35,7 @@ Finally add the following to your config  `plugin = /path/to/hyprsplit/hyprsplit
 | name | description | type | default |
 |---|---|---|---|
 | num_workspaces | Number of workspaces on each monitor | int | 10 |
+| persistent_workspaces | if true, will make workspaces on each monitor persistent (they will always exist and will not be destroyed when empty) | bool | false |
 
 ### Dispatchers
 | Dispatcher | Description | Params |

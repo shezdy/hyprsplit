@@ -68,9 +68,10 @@ void ensureGoodWorkspaces() {
         return;
 
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
+    static auto* const PERSISTENT    = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:persistent_workspaces")->getDataStaticPtr();
 
     for (auto& m : g_pCompositor->m_vMonitors) {
-        if (m->szName == "HEADLESS-1")
+        if (m->szName.starts_with("HEADLESS") || m->isMirror())
             continue;
 
         const int MIN = m->ID * (**NUMWORKSPACES) + 1;
@@ -98,6 +99,19 @@ void ensureGoodWorkspaces() {
             if (ws->m_iMonitorID != m->ID && ws->m_iID >= MIN && ws->m_iID <= MAX) {
                 Debug::log(LOG, "[hyprsplit] workspace {} on monitor {} move to {} {}", ws->m_iID, ws->m_iMonitorID, m->szName, m->ID);
                 g_pCompositor->moveWorkspaceToMonitor(ws, m.get());
+            }
+
+            if (!**PERSISTENT || !g_pCompositor->getMonitorFromID((ws->m_iID - 1) / **NUMWORKSPACES))
+                ws->m_bPersistent = false;
+        }
+
+        if (**PERSISTENT) {
+            for (auto i = MIN; i <= MAX; i++) {
+                auto ws = g_pCompositor->getWorkspaceByID(i);
+                if (!ws)
+                    ws = g_pCompositor->createNewWorkspace(i, m->ID);
+
+                ws->m_bPersistent = true;
             }
         }
     }
@@ -229,8 +243,8 @@ void swapActiveWorkspaces(std::string args) {
         PMON2->activeWorkspace = PWORKSPACEA;
 
         // swap workspace ids
-        const auto TMPID   = PWORKSPACEA->m_iID;
-        const auto TMPNAME = PWORKSPACEA->m_szName;
+        const auto TMPID      = PWORKSPACEA->m_iID;
+        const auto TMPNAME    = PWORKSPACEA->m_szName;
         PWORKSPACEA->m_iID    = PWORKSPACEB->m_iID;
         PWORKSPACEA->m_szName = PWORKSPACEB->m_szName;
         PWORKSPACEB->m_iID    = TMPID;
@@ -353,6 +367,28 @@ void onMonitorAdded(CMonitor* pMonitor) {
     ensureGoodWorkspaces();
 }
 
+void onMonitorRemoved(CMonitor* pMonitor) {
+    Debug::log(LOG, "[hyprsplit] monitor removed {}", pMonitor->szName);
+
+    static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
+    static auto* const PERSISTENT    = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:persistent_workspaces")->getDataStaticPtr();
+
+    if (**PERSISTENT) {
+        const int  MIN = pMonitor->ID * (**NUMWORKSPACES) + 1;
+        const int  MAX = (pMonitor->ID + 1) * (**NUMWORKSPACES);
+
+        const auto WSSIZE = g_pCompositor->m_vWorkspaces.size();
+        for (size_t i = 0; i < WSSIZE; i++) {
+            const auto& ws = g_pCompositor->m_vWorkspaces[i];
+            if (!valid(ws))
+                continue;
+
+            if (ws->m_iID >= MIN && ws->m_iID <= MAX)
+                ws->m_bPersistent = false;
+        }
+    }
+}
+
 // Do NOT change this function.
 APICALL EXPORT std::string PLUGIN_API_VERSION() {
     return HYPRLAND_API_VERSION;
@@ -370,7 +406,9 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
                                      CColor{1.0, 0.2, 0.2, 1.0}, 5000);
         throw std::runtime_error("[hyprsplit] Version mismatch");
     }
+
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces", Hyprlang::INT{10});
+    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprsplit:persistent_workspaces", Hyprlang::INT{0});
 
     HyprlandAPI::addDispatcher(PHANDLE, "split:workspace", focusWorkspace);
     HyprlandAPI::addDispatcher(PHANDLE, "split:movetoworkspace", moveToWorkspace);
@@ -380,6 +418,8 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     static auto monitorAddedHook =
         HyprlandAPI::registerCallbackDynamic(PHANDLE, "monitorAdded", [&](void* self, SCallbackInfo& info, std::any data) { onMonitorAdded(std::any_cast<CMonitor*>(data)); });
+    static auto monitorRemovedHook =
+        HyprlandAPI::registerCallbackDynamic(PHANDLE, "monitorRemoved", [&](void* self, SCallbackInfo& info, std::any data) { onMonitorRemoved(std::any_cast<CMonitor*>(data)); });
     static auto configReloadedHook =
         HyprlandAPI::registerCallbackDynamic(PHANDLE, "configReloaded", [&](void* self, SCallbackInfo& info, std::any data) { ensureGoodWorkspaces(); });
 
