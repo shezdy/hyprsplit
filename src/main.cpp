@@ -89,6 +89,14 @@ void ensureGoodWorkspaces() {
 
             m->changeWorkspace(ws, false, true, true);
         }
+    }
+
+    for (auto& m : g_pCompositor->m_vMonitors) {
+        if (m->szName.starts_with("HEADLESS") || m->isMirror())
+            continue;
+
+        const int  MIN = m->ID * (**NUMWORKSPACES) + 1;
+        const int  MAX = (m->ID + 1) * (**NUMWORKSPACES);
 
         const auto WSSIZE = g_pCompositor->m_vWorkspaces.size();
         for (size_t i = 0; i < WSSIZE; i++) {
@@ -96,13 +104,13 @@ void ensureGoodWorkspaces() {
             if (!valid(ws))
                 continue;
 
+            if (!**PERSISTENT || !g_pCompositor->getMonitorFromID((ws->m_iID - 1) / **NUMWORKSPACES))
+                ws->m_bPersistent = false;
+
             if (ws->m_iMonitorID != m->ID && ws->m_iID >= MIN && ws->m_iID <= MAX) {
                 Debug::log(LOG, "[hyprsplit] workspace {} on monitor {} move to {} {}", ws->m_iID, ws->m_iMonitorID, m->szName, m->ID);
                 g_pCompositor->moveWorkspaceToMonitor(ws, m.get());
             }
-
-            if (!**PERSISTENT || !g_pCompositor->getMonitorFromID((ws->m_iID - 1) / **NUMWORKSPACES))
-                ws->m_bPersistent = false;
         }
 
         if (**PERSISTENT) {
