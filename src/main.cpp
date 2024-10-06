@@ -431,4 +431,15 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
 APICALL EXPORT void PLUGIN_EXIT() {
     Debug::log(LOG, "[hyprsplit] plugin exit");
+
+    static auto* const PERSISTENT = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:persistent_workspaces")->getDataStaticPtr();
+    if (**PERSISTENT) {
+        const auto WSSIZE = g_pCompositor->m_vWorkspaces.size();
+        for (size_t i = 0; i < WSSIZE; i++) {
+            const auto& ws = g_pCompositor->m_vWorkspaces[i];
+            if (!valid(ws))
+                continue;
+            ws->m_bPersistent = false;
+        }
+    }
 }
