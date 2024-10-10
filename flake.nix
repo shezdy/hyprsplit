@@ -20,13 +20,14 @@
       rawCommitPins
     );
     srcRev = "${commitPins.${hyprland.rev} or "git"}";
+    srcRevShort = builtins.substring 0 7 srcRev;
   in {
     packages = eachSystem (system: let
       pkgs = pkgsFor.${system};
     in rec {
       hyprsplit = pkgs.stdenv.mkDerivation {
         pname = "hyprsplit";
-        version = "0.1";
+        version = "flakeRev=${self.shortRev or "dirty"}_srcRev=${srcRevShort}";
         src =
           if (commitPins ? ${hyprland.rev}) && (self ? rev)
           then
