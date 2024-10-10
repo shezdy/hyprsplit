@@ -11,14 +11,31 @@
     inherit (hyprland.inputs) nixpkgs;
     eachSystem = nixpkgs.lib.genAttrs (import hyprland.inputs.systems);
     pkgsFor = eachSystem (system: import nixpkgs {localSystem = system;});
+    rawCommitPins = (builtins.fromTOML (builtins.readFile ./hyprpm.toml)).repository.commit_pins;
+    commitPins = builtins.listToAttrs (
+      map (p: {
+        name = builtins.head p;
+        value = builtins.elemAt p 1;
+      })
+      rawCommitPins
+    );
+    srcRev = "${commitPins.${hyprland.rev} or "git"}";
+    srcRevShort = builtins.substring 0 7 srcRev;
   in {
     packages = eachSystem (system: let
       pkgs = pkgsFor.${system};
     in rec {
       hyprsplit = pkgs.stdenv.mkDerivation {
         pname = "hyprsplit";
-        version = "0.1";
-        src = ./.;
+        version = "flakeRev=${self.shortRev or "dirty"}_srcRev=${srcRevShort}";
+        src =
+          if (commitPins ? ${hyprland.rev}) && (self ? rev)
+          then
+            (builtins.fetchGit {
+              url = "https://github.com/shezdy/hyprsplit";
+              rev = srcRev;
+            })
+          else ./.;
 
         nativeBuildInputs = with pkgs; [pkg-config meson ninja];
         buildInputs = with pkgs;
