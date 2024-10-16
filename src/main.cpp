@@ -397,6 +397,11 @@ void onMonitorRemoved(CMonitor* pMonitor) {
     }
 }
 
+// other plugins can use this to convert a regular hyprland workspace string the correct hyprsplit one
+APICALL EXPORT std::string hyprsplitGetWorkspace(const std::string& workspace) {
+    return getWorkspaceOnCurrentMonitor(workspace);
+}
+
 // Do NOT change this function.
 APICALL EXPORT std::string PLUGIN_API_VERSION() {
     return HYPRLAND_API_VERSION;
