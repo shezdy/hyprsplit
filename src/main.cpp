@@ -195,7 +195,7 @@ void swapActiveWorkspaces(std::string args) {
 
     // with known layouts, swap the workspaces between monitors, then fix the layout
     // with an unknown layout (eg from a plugin) do a "dumb" swap by moving the windows between the workspaces.
-    if (LAYOUTNAME == "dwindle" || LAYOUTNAME == "master") {
+    if (LAYOUTNAME == "dwindle" || LAYOUTNAME == "master" || LAYOUTNAME == "hy3") {
         // proceed as Hyprland normally would (see CCompositor::swapActiveWorkspaces)
         PWORKSPACEA->m_iMonitorID = PMON2->ID;
         PWORKSPACEA->moveToMonitor(PMON2->ID);
