@@ -369,13 +369,13 @@ void grabRogueWindows(std::string args) {
     }
 }
 
-void onMonitorAdded(CMonitor* pMonitor) {
+void onMonitorAdded(PHLMONITOR pMonitor) {
     Debug::log(LOG, "[hyprsplit] monitor added {}", pMonitor->szName);
 
     ensureGoodWorkspaces();
 }
 
-void onMonitorRemoved(CMonitor* pMonitor) {
+void onMonitorRemoved(PHLMONITOR pMonitor) {
     Debug::log(LOG, "[hyprsplit] monitor removed {}", pMonitor->szName);
 
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
@@ -430,9 +430,9 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     HyprlandAPI::addDispatcher(PHANDLE, "split:grabroguewindows", grabRogueWindows);
 
     static auto monitorAddedHook =
-        HyprlandAPI::registerCallbackDynamic(PHANDLE, "monitorAdded", [&](void* self, SCallbackInfo& info, std::any data) { onMonitorAdded(std::any_cast<CMonitor*>(data)); });
+        HyprlandAPI::registerCallbackDynamic(PHANDLE, "monitorAdded", [&](void* self, SCallbackInfo& info, std::any data) { onMonitorAdded(std::any_cast<PHLMONITOR>(data)); });
     static auto monitorRemovedHook =
-        HyprlandAPI::registerCallbackDynamic(PHANDLE, "monitorRemoved", [&](void* self, SCallbackInfo& info, std::any data) { onMonitorRemoved(std::any_cast<CMonitor*>(data)); });
+        HyprlandAPI::registerCallbackDynamic(PHANDLE, "monitorRemoved", [&](void* self, SCallbackInfo& info, std::any data) { onMonitorRemoved(std::any_cast<PHLMONITOR>(data)); });
     static auto configReloadedHook =
         HyprlandAPI::registerCallbackDynamic(PHANDLE, "configReloaded", [&](void* self, SCallbackInfo& info, std::any data) { ensureGoodWorkspaces(); });
 
