@@ -84,7 +84,7 @@ void ensureGoodWorkspaces() {
             if (!ws) {
                 ws = g_pCompositor->createNewWorkspace(MIN, m->ID);
             } else if (ws->m_iMonitorID != m->ID) {
-                g_pCompositor->moveWorkspaceToMonitor(ws, m.get());
+                g_pCompositor->moveWorkspaceToMonitor(ws, m);
             }
 
             m->changeWorkspace(ws, false, true, true);
@@ -109,7 +109,7 @@ void ensureGoodWorkspaces() {
 
             if (ws->m_iMonitorID != m->ID && ws->m_iID >= MIN && ws->m_iID <= MAX) {
                 Debug::log(LOG, "[hyprsplit] workspace {} on monitor {} move to {} {}", ws->m_iID, ws->m_iMonitorID, m->szName, m->ID);
-                g_pCompositor->moveWorkspaceToMonitor(ws, m.get());
+                g_pCompositor->moveWorkspaceToMonitor(ws, m);
             }
         }
 
