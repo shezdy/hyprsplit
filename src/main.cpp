@@ -83,7 +83,7 @@ void ensureGoodWorkspaces() {
 
             if (!ws) {
                 ws = g_pCompositor->createNewWorkspace(MIN, m->ID);
-            } else if (ws->m_iMonitorID != m->ID) {
+            } else if (ws->monitorID() != m->ID) {
                 g_pCompositor->moveWorkspaceToMonitor(ws, m);
             }
 
@@ -107,8 +107,8 @@ void ensureGoodWorkspaces() {
             if (!**PERSISTENT || !g_pCompositor->getMonitorFromID((ws->m_iID - 1) / **NUMWORKSPACES))
                 ws->m_bPersistent = false;
 
-            if (ws->m_iMonitorID != m->ID && ws->m_iID >= MIN && ws->m_iID <= MAX) {
-                Debug::log(LOG, "[hyprsplit] workspace {} on monitor {} move to {} {}", ws->m_iID, ws->m_iMonitorID, m->szName, m->ID);
+            if (ws->monitorID() != m->ID && ws->m_iID >= MIN && ws->m_iID <= MAX) {
+                Debug::log(LOG, "[hyprsplit] workspace {} on monitor {} move to {} {}", ws->m_iID, ws->monitorID(), m->szName, m->ID);
                 g_pCompositor->moveWorkspaceToMonitor(ws, m);
             }
         }
@@ -150,7 +150,7 @@ void focusWorkspace(std::string args) {
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
     const int          MIN           = PCURRMONITOR->ID * (**NUMWORKSPACES) + 1;
     const int          MAX           = (PCURRMONITOR->ID + 1) * (**NUMWORKSPACES);
-    if (PWORKSPACE->m_iMonitorID != PCURRMONITOR->ID && (WORKSPACEID >= MIN && WORKSPACEID <= MAX)) {
+    if (PWORKSPACE->monitorID() != PCURRMONITOR->ID && (WORKSPACEID >= MIN && WORKSPACEID <= MAX)) {
         Debug::log(WARN, "[hyprsplit] focusWorkspace: workspace exists but is on the wrong monitor?");
         ensureGoodWorkspaces();
     }
@@ -197,7 +197,7 @@ void swapActiveWorkspaces(std::string args) {
     // with an unknown layout (eg from a plugin) do a "dumb" swap by moving the windows between the workspaces.
     if (LAYOUTNAME == "dwindle" || LAYOUTNAME == "master" || LAYOUTNAME == "hy3") {
         // proceed as Hyprland normally would (see CCompositor::swapActiveWorkspaces)
-        PWORKSPACEA->m_iMonitorID = PMON2->ID;
+        PWORKSPACEA->m_pMonitor = PMON2;
         PWORKSPACEA->moveToMonitor(PMON2->ID);
 
         for (auto& w : g_pCompositor->m_vWindows) {
@@ -207,7 +207,7 @@ void swapActiveWorkspaces(std::string args) {
                     continue;
                 }
 
-                w->m_iMonitorID = PMON2->ID;
+                w->m_pMonitor = PMON2;
 
                 // additionally, move floating and fs windows manually
                 if (w->m_bIsFloating)
@@ -222,7 +222,7 @@ void swapActiveWorkspaces(std::string args) {
             }
         }
 
-        PWORKSPACEB->m_iMonitorID = PMON1->ID;
+        PWORKSPACEB->m_pMonitor = PMON1;
         PWORKSPACEB->moveToMonitor(PMON1->ID);
 
         for (auto& w : g_pCompositor->m_vWindows) {
@@ -232,7 +232,7 @@ void swapActiveWorkspaces(std::string args) {
                     continue;
                 }
 
-                w->m_iMonitorID = PMON1->ID;
+                w->m_pMonitor = PMON1;
 
                 // additionally, move floating and fs windows manually
                 if (w->m_bIsFloating)
