@@ -344,6 +344,7 @@ void grabRogueWindows(std::string args) {
     }
 
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
+    static auto* const BUNDLE_MONITORS = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:bundle_monitors")->getDataStaticPtr();
 
     for (auto& w : g_pCompositor->m_vWindows) {
         if (!w->m_bIsMapped || w->onSpecialWorkspace())
@@ -354,6 +355,8 @@ void grabRogueWindows(std::string args) {
         for (auto& m : g_pCompositor->m_vMonitors) {
             const int MIN = m->ID * (**NUMWORKSPACES) + 1;
             const int MAX = (m->ID + 1) * (**NUMWORKSPACES);
+            Debug::log(LOG, "[hyprsplit] window {} is currently in activeWorkspaceId {} with MIN={}, MAX={}",
+                       w->m_szTitle, w->m_pWorkspace->m_iID, MIN, MAX);
 
             if (w->workspaceID() >= MIN && w->workspaceID() <= MAX) {
                 inGoodWorkspace = true;
@@ -362,8 +365,14 @@ void grabRogueWindows(std::string args) {
         }
 
         if (!inGoodWorkspace) {
-            Debug::log(LOG, "[hyprsplit] moving window {} to workspace {}", w->m_szTitle, PWORKSPACE->m_iID);
-            const auto args = std::format("{},address:0x{:x}", PWORKSPACE->m_iID, (uintptr_t)w.get());
+            int newWorkspace = PWORKSPACE->m_iID;
+            if (**BUNDLE_MONITORS == 1)
+            {
+                newWorkspace = w->m_pWorkspace->m_iID % **NUMWORKSPACES;
+            }
+            const auto args = std::format("{},address:0x{:x}", newWorkspace, (uintptr_t)w.get());
+            Debug::log(LOG, "[hyprsplit] moving window {} to workspace {} (args: {})",
+                       w->m_szTitle, newWorkspace, args);
             g_pKeybindManager->m_mDispatchers["movetoworkspacesilent"](args);
         }
     }
@@ -417,6 +426,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces", Hyprlang::INT{10});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprsplit:persistent_workspaces", Hyprlang::INT{0});
+    HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprsplit:bundle_monitors", Hyprlang::INT{0});
 
     HyprlandAPI::addDispatcher(PHANDLE, "split:workspace", focusWorkspace);
     HyprlandAPI::addDispatcher(PHANDLE, "split:movetoworkspace", moveToWorkspace);
