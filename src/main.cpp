@@ -125,6 +125,28 @@ void ensureGoodWorkspaces() {
     }
 }
 
+void focusMultipleWorkspaces(int workspaceId) {
+    static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
+
+    for (auto& m : g_pCompositor->m_vMonitors) {
+        int workspaceRelativeId = workspaceId % (**NUMWORKSPACES);
+        if (workspaceRelativeId == 0) {
+            workspaceRelativeId += **NUMWORKSPACES;
+        }
+
+        const int workspaceToMove = m->ID * (**NUMWORKSPACES) + workspaceRelativeId;
+        Debug::log(LOG, "[hyprsplit] need to move workspace {} on monitor {}",
+                   workspaceToMove, m->ID);
+
+        auto PWORKSPACE = g_pCompositor->getWorkspaceByID(workspaceToMove);
+        if (!PWORKSPACE) {
+            PWORKSPACE = g_pCompositor->createNewWorkspace(workspaceToMove, g_pCompositor->m_pLastMonitor);
+        }
+
+        g_pKeybindManager->m_mDispatchers["workspace"](PWORKSPACE->getConfigName());
+    }
+}
+
 void focusWorkspace(std::string args) {
     const auto PCURRMONITOR = g_pCompositor->m_pLastMonitor;
 
@@ -137,6 +159,13 @@ void focusWorkspace(std::string args) {
 
     if (WORKSPACEID == WORKSPACE_INVALID) {
         Debug::log(ERR, "[hyprsplit] focusWorkspace: invalid workspace");
+        return;
+    }
+
+    static auto* const BUNDLE_MONITORS = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:bundle_monitors")->getDataStaticPtr();
+    if (**BUNDLE_MONITORS)
+    {
+        focusMultipleWorkspaces(WORKSPACEID);
         return;
     }
 
