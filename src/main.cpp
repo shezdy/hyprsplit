@@ -47,7 +47,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
             const int  id         = g_pCompositor->m_pLastMonitor->ID * (**NUMWORKSPACES) + i;
             const auto PWORKSPACE = g_pCompositor->getWorkspaceByID(id);
 
-            if (!PWORKSPACE || (g_pCompositor->getWindowsOnWorkspace(id) == 0))
+            if (!PWORKSPACE || (PWORKSPACE->getWindows() == 0))
                 return std::to_string(id);
         }
 
