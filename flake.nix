@@ -37,7 +37,7 @@
             })
           else ./.;
 
-        nativeBuildInputs = with pkgs; [pkg-config meson ninja];
+        nativeBuildInputs = with pkgs; [pkg-config meson ninja gcc14];
         buildInputs = with pkgs;
           [
             hyprland.packages.${system}.hyprland.dev
@@ -60,7 +60,7 @@
     devShells = eachSystem (system: let
       pkgs = pkgsFor.${system};
     in {
-      default = pkgs.mkShell.override {stdenv = pkgs.gcc13Stdenv;} {
+      default = pkgs.mkShell.override {stdenv = pkgs.gcc14Stdenv;} {
         shellHook = ''
           meson setup build --reconfigure
           cp ./build/compile_commands.json ./compile_commands.json
