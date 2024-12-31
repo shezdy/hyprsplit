@@ -125,26 +125,26 @@ void ensureGoodWorkspaces() {
     }
 }
 
-void focusWorkspace(std::string args) {
+SDispatchResult focusWorkspace(std::string args) {
     const auto PCURRMONITOR = g_pCompositor->m_pLastMonitor;
 
     if (!PCURRMONITOR) {
         Debug::log(ERR, "[hyprsplit] focusWorkspace: monitor doesn't exist");
-        return;
+        return {.success = false, .error = "focusWorkspace: monitor doesn't exist"};
     }
 
     const int WORKSPACEID = getWorkspaceIDNameFromString(getWorkspaceOnCurrentMonitor(args)).id;
 
     if (WORKSPACEID == WORKSPACE_INVALID) {
         Debug::log(ERR, "[hyprsplit] focusWorkspace: invalid workspace");
-        return;
+        return {.success = false, .error = "focusWorkspace: invalid workspace"};
     }
 
     auto PWORKSPACE = g_pCompositor->getWorkspaceByID(WORKSPACEID);
     if (!PWORKSPACE) {
         PWORKSPACE = g_pCompositor->createNewWorkspace(WORKSPACEID, PCURRMONITOR->ID);
         g_pKeybindManager->m_mDispatchers["workspace"](PWORKSPACE->getConfigName());
-        return;
+        return {};
     }
 
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
@@ -155,27 +155,30 @@ void focusWorkspace(std::string args) {
         ensureGoodWorkspaces();
     }
     g_pKeybindManager->m_mDispatchers["workspace"](PWORKSPACE->getConfigName());
+    return {};
 }
 
-void moveToWorkspace(std::string args) {
+SDispatchResult moveToWorkspace(std::string args) {
     if (args.contains(','))
         args = getWorkspaceOnCurrentMonitor(args.substr(0, args.find_last_of(','))) + "," + args.substr(args.find_last_of(',') + 1);
     else
         args = getWorkspaceOnCurrentMonitor(args);
 
     g_pKeybindManager->m_mDispatchers["movetoworkspace"](args);
+    return {};
 }
 
-void moveToWorkspaceSilent(std::string args) {
+SDispatchResult moveToWorkspaceSilent(std::string args) {
     if (args.contains(','))
         args = getWorkspaceOnCurrentMonitor(args.substr(0, args.find_last_of(','))) + "," + args.substr(args.find_last_of(',') + 1);
     else
         args = getWorkspaceOnCurrentMonitor(args);
 
     g_pKeybindManager->m_mDispatchers["movetoworkspacesilent"](args);
+    return {};
 }
 
-void swapActiveWorkspaces(std::string args) {
+SDispatchResult swapActiveWorkspaces(std::string args) {
     const auto MON1 = args.substr(0, args.find_first_of(' '));
     const auto MON2 = args.substr(args.find_first_of(' ') + 1);
 
@@ -183,13 +186,13 @@ void swapActiveWorkspaces(std::string args) {
     const auto PMON2 = g_pCompositor->getMonitorFromString(MON2);
 
     if (!PMON1 || !PMON2 || PMON1 == PMON2)
-        return;
+        return {};
 
     const auto PWORKSPACEA = PMON1->activeWorkspace;
     const auto PWORKSPACEB = PMON2->activeWorkspace;
 
     if (!PWORKSPACEA || !valid(PWORKSPACEA) || !PWORKSPACEB || !valid(PWORKSPACEB))
-        return;
+        return {};
 
     const auto LAYOUTNAME = g_pLayoutManager->m_vLayouts[g_pLayoutManager->m_iCurrentLayoutID].first;
 
@@ -333,14 +336,15 @@ void swapActiveWorkspaces(std::string args) {
     }
 
     g_pInputManager->refocus();
+    return {};
 }
 
-void grabRogueWindows(std::string args) {
+SDispatchResult grabRogueWindows(std::string args) {
     const auto PWORKSPACE = g_pCompositor->m_pLastMonitor->activeWorkspace;
 
     if (!PWORKSPACE) {
         Debug::log(ERR, "[hyprsplit] no active workspace?");
-        return;
+        return {.success = false, .error = "no active workspace?"};
     }
 
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
@@ -367,6 +371,7 @@ void grabRogueWindows(std::string args) {
             g_pKeybindManager->m_mDispatchers["movetoworkspacesilent"](args);
         }
     }
+    return {};
 }
 
 void onMonitorAdded(PHLMONITOR pMonitor) {
@@ -423,11 +428,11 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces", Hyprlang::INT{10});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprsplit:persistent_workspaces", Hyprlang::INT{0});
 
-    HyprlandAPI::addDispatcher(PHANDLE, "split:workspace", focusWorkspace);
-    HyprlandAPI::addDispatcher(PHANDLE, "split:movetoworkspace", moveToWorkspace);
-    HyprlandAPI::addDispatcher(PHANDLE, "split:movetoworkspacesilent", moveToWorkspaceSilent);
-    HyprlandAPI::addDispatcher(PHANDLE, "split:swapactiveworkspaces", swapActiveWorkspaces);
-    HyprlandAPI::addDispatcher(PHANDLE, "split:grabroguewindows", grabRogueWindows);
+    HyprlandAPI::addDispatcherV2(PHANDLE, "split:workspace", focusWorkspace);
+    HyprlandAPI::addDispatcherV2(PHANDLE, "split:movetoworkspace", moveToWorkspace);
+    HyprlandAPI::addDispatcherV2(PHANDLE, "split:movetoworkspacesilent", moveToWorkspaceSilent);
+    HyprlandAPI::addDispatcherV2(PHANDLE, "split:swapactiveworkspaces", swapActiveWorkspaces);
+    HyprlandAPI::addDispatcherV2(PHANDLE, "split:grabroguewindows", grabRogueWindows);
 
     static auto monitorAddedHook =
         HyprlandAPI::registerCallbackDynamic(PHANDLE, "monitorAdded", [&](void* self, SCallbackInfo& info, std::any data) { onMonitorAdded(std::any_cast<PHLMONITOR>(data)); });
