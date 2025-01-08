@@ -214,11 +214,11 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
 
                 // additionally, move floating and fs windows manually
                 if (w->m_bIsFloating)
-                    w->m_vRealPosition = w->m_vRealPosition.goal() - PMON1->vecPosition + PMON2->vecPosition;
+                    *w->m_vRealPosition = w->m_vRealPosition->goal() - PMON1->vecPosition + PMON2->vecPosition;
 
                 if (w->isFullscreen()) {
-                    w->m_vRealPosition = PMON2->vecPosition;
-                    w->m_vRealSize     = PMON2->vecSize;
+                    *w->m_vRealPosition = PMON2->vecPosition;
+                    *w->m_vRealSize     = PMON2->vecSize;
                 }
 
                 w->updateToplevel();
@@ -239,11 +239,11 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
 
                 // additionally, move floating and fs windows manually
                 if (w->m_bIsFloating)
-                    w->m_vRealPosition = w->m_vRealPosition.goal() - PMON2->vecPosition + PMON1->vecPosition;
+                    *w->m_vRealPosition = w->m_vRealPosition->goal() - PMON2->vecPosition + PMON1->vecPosition;
 
                 if (w->isFullscreen()) {
-                    w->m_vRealPosition = PMON1->vecPosition;
-                    w->m_vRealSize     = PMON1->vecSize;
+                    *w->m_vRealPosition = PMON1->vecPosition;
+                    *w->m_vRealSize     = PMON1->vecSize;
                 }
 
                 w->updateToplevel();
