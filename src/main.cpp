@@ -263,11 +263,8 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
 
         // swap previous workspaces
         const auto TMPPREV                      = PWORKSPACEA->m_sPrevWorkspace;
-        const auto TMPPREVPERMONITOR            = PWORKSPACEA->m_sPrevWorkspacePerMonitor;
         PWORKSPACEA->m_sPrevWorkspace           = PWORKSPACEB->m_sPrevWorkspace;
-        PWORKSPACEA->m_sPrevWorkspacePerMonitor = PWORKSPACEB->m_sPrevWorkspacePerMonitor;
         PWORKSPACEB->m_sPrevWorkspace           = TMPPREV;
-        PWORKSPACEB->m_sPrevWorkspacePerMonitor = TMPPREVPERMONITOR;
 
         // fix the layout nodes
         if (LAYOUTNAME == "dwindle") {
