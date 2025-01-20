@@ -4,6 +4,11 @@
 
 #define private public
 #include <hyprland/src/Compositor.hpp>
+#include <hyprland/src/helpers/Monitor.hpp>
+#include <hyprland/src/managers/EventManager.hpp>
+#include <hyprland/src/managers/HookSystemManager.hpp>
+#include <hyprland/src/managers/LayoutManager.hpp>
+#include <hyprland/src/managers/input/InputManager.hpp>
 #undef private
 
 using namespace Hyprutils::String;
