@@ -76,7 +76,7 @@ void ensureGoodWorkspaces() {
     static auto* const PERSISTENT    = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:persistent_workspaces")->getDataStaticPtr();
 
     for (auto& m : g_pCompositor->m_vMonitors) {
-        if (m->szName.starts_with("HEADLESS") || m->isMirror())
+        if (m->ID == MONITOR_INVALID || m->isMirror())
             continue;
 
         const int MIN = m->ID * (**NUMWORKSPACES) + 1;
@@ -97,7 +97,7 @@ void ensureGoodWorkspaces() {
     }
 
     for (auto& m : g_pCompositor->m_vMonitors) {
-        if (m->szName.starts_with("HEADLESS") || m->isMirror())
+        if (m->ID == MONITOR_INVALID || m->isMirror())
             continue;
 
         const int  MIN = m->ID * (**NUMWORKSPACES) + 1;
