@@ -46,6 +46,17 @@ Finally add the following to your config  `plugin = /path/to/hyprsplit/hyprsplit
 | split:swapactiveworkspaces | Swaps all windows in active workspaces between two monitors | two monitors separated by a space |
 | split:grabroguewindows | Finds all windows that are in invalid workspaces and moves them to the current workspace. Useful when unplugging monitors. | none |
 
+Some of Hyprland's workspace parameters are treated differently by the plugin's dispatchers:
+-  `1`,`2`, or `3`: number on current monitor
+-  `+1` or `-1`: relative on current monitor, no looping
+-  `r+1` or `r-1`: relative on current monitor, with looping
+-  `e+1`, `e-1`: relative on current monitor, excluding empty workspaces, same as m+1
+- `empty`: empty workspace on current monitor
+
+All other workspace params will be treated the same as however Hyprland normally treats them.
+
+If you are using hy3 you should use `hy3:movetoworkspace` instead of `split:movetoworkspace`, it has compatibility with hyprsplit.
+
 ### Example Config
 ```
 plugin {
