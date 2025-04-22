@@ -14,7 +14,7 @@
 using namespace Hyprutils::String;
 
 std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
-    if (!g_pCompositor->m_pLastMonitor) {
+    if (!g_pCompositor->m_lastMonitor) {
         Debug::log(ERR, "[hyprsplit] no monitor in getWorkspaceOnCurrentMonitor?");
         return workspace;
     }
@@ -23,7 +23,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
 
     if (workspace[0] == '+' || workspace[0] == '-') {
-        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, ((g_pCompositor->m_pLastMonitor->activeWorkspaceID() - 1) % **NUMWORKSPACES) + 1);
+        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, ((g_pCompositor->m_lastMonitor->activeWorkspaceID() - 1) % **NUMWORKSPACES) + 1);
 
         if (!PLUSMINUSRESULT.has_value())
             return workspace;
@@ -35,7 +35,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     } else if (isNumber(workspace)) {
         wsID = std::max(std::stoi(workspace), 1);
     } else if (workspace[0] == 'r' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
-        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), g_pCompositor->m_pLastMonitor->activeWorkspaceID());
+        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), g_pCompositor->m_lastMonitor->activeWorkspaceID());
 
         if (!PLUSMINUSRESULT.has_value())
             return workspace;
@@ -49,7 +49,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     } else if (workspace.starts_with("empty")) {
         int i = 0;
         while (++i <= **NUMWORKSPACES) {
-            const int  id         = g_pCompositor->m_pLastMonitor->ID * (**NUMWORKSPACES) + i;
+            const int  id         = g_pCompositor->m_lastMonitor->ID * (**NUMWORKSPACES) + i;
             const auto PWORKSPACE = g_pCompositor->getWorkspaceByID(id);
 
             if (!PWORKSPACE || (PWORKSPACE->getWindows() == 0))
@@ -57,7 +57,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
         }
 
         Debug::log(LOG, "[hyprsplit] no empty workspace on monitor");
-        return std::to_string(g_pCompositor->m_pLastMonitor->activeWorkspaceID());
+        return std::to_string(g_pCompositor->m_lastMonitor->activeWorkspaceID());
     } else {
         return workspace;
     }
@@ -65,17 +65,17 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     if (wsID > **NUMWORKSPACES)
         wsID = ((wsID - 1) % **NUMWORKSPACES) + 1;
 
-    return std::to_string(g_pCompositor->m_pLastMonitor->ID * (**NUMWORKSPACES) + wsID);
+    return std::to_string(g_pCompositor->m_lastMonitor->ID * (**NUMWORKSPACES) + wsID);
 }
 
 void ensureGoodWorkspaces() {
-    if (g_pCompositor->m_bUnsafeState)
+    if (g_pCompositor->m_unsafeState)
         return;
 
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
     static auto* const PERSISTENT    = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:persistent_workspaces")->getDataStaticPtr();
 
-    for (auto& m : g_pCompositor->m_vMonitors) {
+    for (auto& m : g_pCompositor->m_monitors) {
         if (m->ID == MONITOR_INVALID || m->isMirror())
             continue;
 
@@ -96,16 +96,16 @@ void ensureGoodWorkspaces() {
         }
     }
 
-    for (auto& m : g_pCompositor->m_vMonitors) {
+    for (auto& m : g_pCompositor->m_monitors) {
         if (m->ID == MONITOR_INVALID || m->isMirror())
             continue;
 
         const int  MIN = m->ID * (**NUMWORKSPACES) + 1;
         const int  MAX = (m->ID + 1) * (**NUMWORKSPACES);
 
-        const auto WSSIZE = g_pCompositor->m_vWorkspaces.size();
+        const auto WSSIZE = g_pCompositor->m_workspaces.size();
         for (size_t i = 0; i < WSSIZE; i++) {
-            const auto& ws = g_pCompositor->m_vWorkspaces[i];
+            const auto& ws = g_pCompositor->m_workspaces[i];
             if (!valid(ws))
                 continue;
 
@@ -131,7 +131,7 @@ void ensureGoodWorkspaces() {
 }
 
 SDispatchResult focusWorkspace(std::string args) {
-    const auto PCURRMONITOR = g_pCompositor->m_pLastMonitor;
+    const auto PCURRMONITOR = g_pCompositor->m_lastMonitor;
 
     if (!PCURRMONITOR) {
         Debug::log(ERR, "[hyprsplit] focusWorkspace: monitor doesn't exist");
@@ -208,7 +208,7 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
         PWORKSPACEA->m_pMonitor = PMON2;
         PWORKSPACEA->moveToMonitor(PMON2->ID);
 
-        for (auto& w : g_pCompositor->m_vWindows) {
+        for (auto& w :g_pCompositor->m_windows) {
             if (w->m_pWorkspace == PWORKSPACEA) {
                 if (w->m_bPinned) {
                     w->m_pWorkspace = PWORKSPACEB;
@@ -233,7 +233,7 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
         PWORKSPACEB->m_pMonitor = PMON1;
         PWORKSPACEB->moveToMonitor(PMON1->ID);
 
-        for (auto& w : g_pCompositor->m_vWindows) {
+        for (auto& w :g_pCompositor->m_windows) {
             if (w->m_pWorkspace == PWORKSPACEB) {
                 if (w->m_bPinned) {
                     w->m_pWorkspace = PWORKSPACEA;
@@ -304,7 +304,7 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
         g_pCompositor->updateFullscreenFadeOnWorkspace(PWORKSPACEB);
 
         // instead of moveworkspace events, we should send movewindow events
-        for (auto& w : g_pCompositor->m_vWindows) {
+        for (auto& w :g_pCompositor->m_windows) {
             if (w->workspaceID() == PWORKSPACEA->m_iID) {
                 g_pEventManager->postEvent(SHyprIPCEvent{"movewindow", std::format("{:x},{}", (uintptr_t)w.get(), PWORKSPACEA->m_szName)});
                 g_pEventManager->postEvent(SHyprIPCEvent{"movewindowv2", std::format("{:x},{},{}", (uintptr_t)w.get(), PWORKSPACEA->m_iID, PWORKSPACEA->m_szName)});
@@ -320,7 +320,7 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
         std::vector<PHLWINDOW> windowsA;
         std::vector<PHLWINDOW> windowsB;
 
-        for (auto& w : g_pCompositor->m_vWindows) {
+        for (auto& w :g_pCompositor->m_windows) {
             if (w->workspaceID() == PWORKSPACEA->m_iID) {
                 windowsA.push_back(w);
             }
@@ -342,7 +342,7 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
 }
 
 SDispatchResult grabRogueWindows(std::string args) {
-    const auto PWORKSPACE = g_pCompositor->m_pLastMonitor->activeWorkspace;
+    const auto PWORKSPACE = g_pCompositor->m_lastMonitor->activeWorkspace;
 
     if (!PWORKSPACE) {
         Debug::log(ERR, "[hyprsplit] no active workspace?");
@@ -351,13 +351,13 @@ SDispatchResult grabRogueWindows(std::string args) {
 
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
 
-    for (auto& w : g_pCompositor->m_vWindows) {
+    for (auto& w :g_pCompositor->m_windows) {
         if (!w->m_bIsMapped || w->onSpecialWorkspace())
             continue;
 
         bool inGoodWorkspace = false;
 
-        for (auto& m : g_pCompositor->m_vMonitors) {
+        for (auto& m : g_pCompositor->m_monitors) {
             const int MIN = m->ID * (**NUMWORKSPACES) + 1;
             const int MAX = (m->ID + 1) * (**NUMWORKSPACES);
 
@@ -392,9 +392,9 @@ void onMonitorRemoved(PHLMONITOR pMonitor) {
         const int  MIN = pMonitor->ID * (**NUMWORKSPACES) + 1;
         const int  MAX = (pMonitor->ID + 1) * (**NUMWORKSPACES);
 
-        const auto WSSIZE = g_pCompositor->m_vWorkspaces.size();
+        const auto WSSIZE = g_pCompositor->m_workspaces.size();
         for (size_t i = 0; i < WSSIZE; i++) {
-            const auto& ws = g_pCompositor->m_vWorkspaces[i];
+            const auto& ws = g_pCompositor->m_workspaces[i];
             if (!valid(ws))
                 continue;
 
@@ -454,9 +454,9 @@ APICALL EXPORT void PLUGIN_EXIT() {
 
     static auto* const PERSISTENT = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:persistent_workspaces")->getDataStaticPtr();
     if (**PERSISTENT) {
-        const auto WSSIZE = g_pCompositor->m_vWorkspaces.size();
+        const auto WSSIZE = g_pCompositor->m_workspaces.size();
         for (size_t i = 0; i < WSSIZE; i++) {
-            const auto& ws = g_pCompositor->m_vWorkspaces[i];
+            const auto& ws = g_pCompositor->m_workspaces[i];
             if (!valid(ws))
                 continue;
             ws->m_bPersistent = false;
