@@ -109,11 +109,11 @@ void ensureGoodWorkspaces() {
             if (!valid(ws))
                 continue;
 
-            if (!**PERSISTENT || !g_pCompositor->getMonitorFromID((ws->m_iID - 1) / **NUMWORKSPACES))
-                ws->m_bPersistent = false;
+            if (!**PERSISTENT || !g_pCompositor->getMonitorFromID((ws->m_id - 1) / **NUMWORKSPACES))
+                ws->m_persistent = false;
 
-            if (ws->monitorID() != m->ID && ws->m_iID >= MIN && ws->m_iID <= MAX) {
-                Debug::log(LOG, "[hyprsplit] workspace {} on monitor {} move to {} {}", ws->m_iID, ws->monitorID(), m->szName, m->ID);
+            if (ws->monitorID() != m->ID && ws->m_id >= MIN && ws->m_id <= MAX) {
+                Debug::log(LOG, "[hyprsplit] workspace {} on monitor {} move to {} {}", ws->m_id, ws->monitorID(), m->szName, m->ID);
                 g_pCompositor->moveWorkspaceToMonitor(ws, m);
             }
         }
@@ -124,7 +124,7 @@ void ensureGoodWorkspaces() {
                 if (!ws)
                     ws = g_pCompositor->createNewWorkspace(i, m->ID);
 
-                ws->m_bPersistent = true;
+                ws->m_persistent = true;
             }
         }
     }
@@ -205,7 +205,7 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
     // with an unknown layout (eg from a plugin) do a "dumb" swap by moving the windows between the workspaces.
     if (LAYOUTNAME == "dwindle" || LAYOUTNAME == "master" || LAYOUTNAME == "hy3") {
         // proceed as Hyprland normally would (see CCompositor::swapActiveWorkspaces)
-        PWORKSPACEA->m_pMonitor = PMON2;
+        PWORKSPACEA->m_monitor = PMON2;
         PWORKSPACEA->moveToMonitor(PMON2->ID);
 
         for (auto& w :g_pCompositor->m_windows) {
@@ -230,7 +230,7 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
             }
         }
 
-        PWORKSPACEB->m_pMonitor = PMON1;
+        PWORKSPACEB->m_monitor = PMON1;
         PWORKSPACEB->moveToMonitor(PMON1->ID);
 
         for (auto& w :g_pCompositor->m_windows) {
@@ -259,41 +259,41 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
         PMON2->activeWorkspace = PWORKSPACEA;
 
         // swap workspace ids
-        const auto TMPID      = PWORKSPACEA->m_iID;
-        const auto TMPNAME    = PWORKSPACEA->m_szName;
-        PWORKSPACEA->m_iID    = PWORKSPACEB->m_iID;
-        PWORKSPACEA->m_szName = PWORKSPACEB->m_szName;
-        PWORKSPACEB->m_iID    = TMPID;
-        PWORKSPACEB->m_szName = TMPNAME;
+        const auto TMPID      = PWORKSPACEA->m_id;
+        const auto TMPNAME    = PWORKSPACEA->m_name;
+        PWORKSPACEA->m_id    = PWORKSPACEB->m_id;
+        PWORKSPACEA->m_name = PWORKSPACEB->m_name;
+        PWORKSPACEB->m_id    = TMPID;
+        PWORKSPACEB->m_name = TMPNAME;
 
         // swap previous workspaces
-        const auto TMPPREV                      = PWORKSPACEA->m_sPrevWorkspace;
-        PWORKSPACEA->m_sPrevWorkspace           = PWORKSPACEB->m_sPrevWorkspace;
-        PWORKSPACEB->m_sPrevWorkspace           = TMPPREV;
+        const auto TMPPREV                      = PWORKSPACEA->m_prevWorkspace;
+        PWORKSPACEA->m_prevWorkspace           = PWORKSPACEB->m_prevWorkspace;
+        PWORKSPACEB->m_prevWorkspace           = TMPPREV;
 
         // fix the layout nodes
         if (LAYOUTNAME == "dwindle") {
             const auto LAYOUT = (CHyprDwindleLayout*)g_pLayoutManager->getCurrentLayout();
             for (auto& n : LAYOUT->m_lDwindleNodesData) {
-                if (n.workspaceID == PWORKSPACEA->m_iID)
-                    n.workspaceID = PWORKSPACEB->m_iID;
-                else if (n.workspaceID == PWORKSPACEB->m_iID)
-                    n.workspaceID = PWORKSPACEA->m_iID;
+                if (n.workspaceID == PWORKSPACEA->m_id)
+                    n.workspaceID = PWORKSPACEB->m_id;
+                else if (n.workspaceID == PWORKSPACEB->m_id)
+                    n.workspaceID = PWORKSPACEA->m_id;
             }
         } else if (LAYOUTNAME == "master") {
             const auto LAYOUT = (CHyprMasterLayout*)g_pLayoutManager->getCurrentLayout();
             for (auto& n : LAYOUT->m_lMasterNodesData) {
-                if (n.workspaceID == PWORKSPACEA->m_iID)
-                    n.workspaceID = PWORKSPACEB->m_iID;
-                else if (n.workspaceID == PWORKSPACEB->m_iID)
-                    n.workspaceID = PWORKSPACEA->m_iID;
+                if (n.workspaceID == PWORKSPACEA->m_id)
+                    n.workspaceID = PWORKSPACEB->m_id;
+                else if (n.workspaceID == PWORKSPACEB->m_id)
+                    n.workspaceID = PWORKSPACEA->m_id;
             }
 
-            const auto WSDATAA = LAYOUT->getMasterWorkspaceData(PWORKSPACEA->m_iID);
-            const auto WSDATAB = LAYOUT->getMasterWorkspaceData(PWORKSPACEB->m_iID);
+            const auto WSDATAA = LAYOUT->getMasterWorkspaceData(PWORKSPACEA->m_id);
+            const auto WSDATAB = LAYOUT->getMasterWorkspaceData(PWORKSPACEB->m_id);
 
-            WSDATAA->workspaceID = PWORKSPACEB->m_iID;
-            WSDATAB->workspaceID = PWORKSPACEA->m_iID;
+            WSDATAA->workspaceID = PWORKSPACEB->m_id;
+            WSDATAB->workspaceID = PWORKSPACEA->m_id;
         }
 
         // recalc layout
@@ -305,13 +305,13 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
 
         // instead of moveworkspace events, we should send movewindow events
         for (auto& w :g_pCompositor->m_windows) {
-            if (w->workspaceID() == PWORKSPACEA->m_iID) {
-                g_pEventManager->postEvent(SHyprIPCEvent{"movewindow", std::format("{:x},{}", (uintptr_t)w.get(), PWORKSPACEA->m_szName)});
-                g_pEventManager->postEvent(SHyprIPCEvent{"movewindowv2", std::format("{:x},{},{}", (uintptr_t)w.get(), PWORKSPACEA->m_iID, PWORKSPACEA->m_szName)});
+            if (w->workspaceID() == PWORKSPACEA->m_id) {
+                g_pEventManager->postEvent(SHyprIPCEvent{"movewindow", std::format("{:x},{}", (uintptr_t)w.get(), PWORKSPACEA->m_name)});
+                g_pEventManager->postEvent(SHyprIPCEvent{"movewindowv2", std::format("{:x},{},{}", (uintptr_t)w.get(), PWORKSPACEA->m_id, PWORKSPACEA->m_name)});
                 EMIT_HOOK_EVENT("moveWindow", (std::vector<std::any>{w, PWORKSPACEA}));
-            } else if (w->workspaceID() == PWORKSPACEB->m_iID) {
-                g_pEventManager->postEvent(SHyprIPCEvent{"movewindow", std::format("{:x},{}", (uintptr_t)w.get(), PWORKSPACEB->m_szName)});
-                g_pEventManager->postEvent(SHyprIPCEvent{"movewindowv2", std::format("{:x},{},{}", (uintptr_t)w.get(), PWORKSPACEB->m_iID, PWORKSPACEB->m_szName)});
+            } else if (w->workspaceID() == PWORKSPACEB->m_id) {
+                g_pEventManager->postEvent(SHyprIPCEvent{"movewindow", std::format("{:x},{}", (uintptr_t)w.get(), PWORKSPACEB->m_name)});
+                g_pEventManager->postEvent(SHyprIPCEvent{"movewindowv2", std::format("{:x},{},{}", (uintptr_t)w.get(), PWORKSPACEB->m_id, PWORKSPACEB->m_name)});
                 EMIT_HOOK_EVENT("moveWindow", (std::vector<std::any>{w, PWORKSPACEB}));
             }
         }
@@ -321,10 +321,10 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
         std::vector<PHLWINDOW> windowsB;
 
         for (auto& w :g_pCompositor->m_windows) {
-            if (w->workspaceID() == PWORKSPACEA->m_iID) {
+            if (w->workspaceID() == PWORKSPACEA->m_id) {
                 windowsA.push_back(w);
             }
-            if (w->workspaceID() == PWORKSPACEB->m_iID) {
+            if (w->workspaceID() == PWORKSPACEB->m_id) {
                 windowsB.push_back(w);
             }
         }
@@ -368,8 +368,8 @@ SDispatchResult grabRogueWindows(std::string args) {
         }
 
         if (!inGoodWorkspace) {
-            Debug::log(LOG, "[hyprsplit] moving window {} to workspace {}", w->m_szTitle, PWORKSPACE->m_iID);
-            const auto args = std::format("{},address:0x{:x}", PWORKSPACE->m_iID, (uintptr_t)w.get());
+            Debug::log(LOG, "[hyprsplit] moving window {} to workspace {}", w->m_szTitle, PWORKSPACE->m_id);
+            const auto args = std::format("{},address:0x{:x}", PWORKSPACE->m_id, (uintptr_t)w.get());
             g_pKeybindManager->m_mDispatchers["movetoworkspacesilent"](args);
         }
     }
@@ -398,8 +398,8 @@ void onMonitorRemoved(PHLMONITOR pMonitor) {
             if (!valid(ws))
                 continue;
 
-            if (ws->m_iID >= MIN && ws->m_iID <= MAX)
-                ws->m_bPersistent = false;
+            if (ws->m_id >= MIN && ws->m_id <= MAX)
+                ws->m_persistent = false;
         }
     }
 }
@@ -459,7 +459,7 @@ APICALL EXPORT void PLUGIN_EXIT() {
             const auto& ws = g_pCompositor->m_workspaces[i];
             if (!valid(ws))
                 continue;
-            ws->m_bPersistent = false;
+            ws->m_persistent = false;
         }
     }
 }
