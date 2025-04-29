@@ -209,21 +209,21 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
         PWORKSPACEA->moveToMonitor(PMON2->ID);
 
         for (auto& w :g_pCompositor->m_windows) {
-            if (w->m_pWorkspace == PWORKSPACEA) {
-                if (w->m_bPinned) {
-                    w->m_pWorkspace = PWORKSPACEB;
+            if (w->m_workspace == PWORKSPACEA) {
+                if (w->m_pinned) {
+                    w->m_workspace = PWORKSPACEB;
                     continue;
                 }
 
-                w->m_pMonitor = PMON2;
+                w->m_monitor = PMON2;
 
                 // additionally, move floating and fs windows manually
-                if (w->m_bIsFloating)
-                    *w->m_vRealPosition = w->m_vRealPosition->goal() - PMON1->vecPosition + PMON2->vecPosition;
+                if (w->m_isFloating)
+                    *w->m_realPosition= w->m_realPosition->goal() - PMON1->vecPosition + PMON2->vecPosition;
 
                 if (w->isFullscreen()) {
-                    *w->m_vRealPosition = PMON2->vecPosition;
-                    *w->m_vRealSize     = PMON2->vecSize;
+                    *w->m_realPosition= PMON2->vecPosition;
+                    *w->m_realSize     = PMON2->vecSize;
                 }
 
                 w->updateToplevel();
@@ -234,21 +234,21 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
         PWORKSPACEB->moveToMonitor(PMON1->ID);
 
         for (auto& w :g_pCompositor->m_windows) {
-            if (w->m_pWorkspace == PWORKSPACEB) {
-                if (w->m_bPinned) {
-                    w->m_pWorkspace = PWORKSPACEA;
+            if (w->m_workspace == PWORKSPACEB) {
+                if (w->m_pinned) {
+                    w->m_workspace = PWORKSPACEA;
                     continue;
                 }
 
-                w->m_pMonitor = PMON1;
+                w->m_monitor = PMON1;
 
                 // additionally, move floating and fs windows manually
-                if (w->m_bIsFloating)
-                    *w->m_vRealPosition = w->m_vRealPosition->goal() - PMON2->vecPosition + PMON1->vecPosition;
+                if (w->m_isFloating)
+                    *w->m_realPosition= w->m_realPosition->goal() - PMON2->vecPosition + PMON1->vecPosition;
 
                 if (w->isFullscreen()) {
-                    *w->m_vRealPosition = PMON1->vecPosition;
-                    *w->m_vRealSize     = PMON1->vecSize;
+                    *w->m_realPosition= PMON1->vecPosition;
+                    *w->m_realSize     = PMON1->vecSize;
                 }
 
                 w->updateToplevel();
@@ -352,7 +352,7 @@ SDispatchResult grabRogueWindows(std::string args) {
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
 
     for (auto& w :g_pCompositor->m_windows) {
-        if (!w->m_bIsMapped || w->onSpecialWorkspace())
+        if (!w->m_isMapped || w->onSpecialWorkspace())
             continue;
 
         bool inGoodWorkspace = false;
@@ -368,7 +368,7 @@ SDispatchResult grabRogueWindows(std::string args) {
         }
 
         if (!inGoodWorkspace) {
-            Debug::log(LOG, "[hyprsplit] moving window {} to workspace {}", w->m_szTitle, PWORKSPACE->m_id);
+            Debug::log(LOG, "[hyprsplit] moving window {} to workspace {}", w->m_title, PWORKSPACE->m_id);
             const auto args = std::format("{},address:0x{:x}", PWORKSPACE->m_id, (uintptr_t)w.get());
             g_pKeybindManager->m_mDispatchers["movetoworkspacesilent"](args);
         }
