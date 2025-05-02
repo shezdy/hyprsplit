@@ -148,7 +148,7 @@ SDispatchResult focusWorkspace(std::string args) {
     auto PWORKSPACE = g_pCompositor->getWorkspaceByID(WORKSPACEID);
     if (!PWORKSPACE) {
         PWORKSPACE = g_pCompositor->createNewWorkspace(WORKSPACEID, PCURRMONITOR->m_id);
-        g_pKeybindManager->m_mDispatchers["workspace"](PWORKSPACE->getConfigName());
+        g_pKeybindManager->m_dispatchers["workspace"](PWORKSPACE->getConfigName());
         return {};
     }
 
@@ -159,7 +159,7 @@ SDispatchResult focusWorkspace(std::string args) {
         Debug::log(WARN, "[hyprsplit] focusWorkspace: workspace exists but is on the wrong monitor?");
         ensureGoodWorkspaces();
     }
-    g_pKeybindManager->m_mDispatchers["workspace"](PWORKSPACE->getConfigName());
+    g_pKeybindManager->m_dispatchers["workspace"](PWORKSPACE->getConfigName());
     return {};
 }
 
@@ -169,7 +169,7 @@ SDispatchResult moveToWorkspace(std::string args) {
     else
         args = getWorkspaceOnCurrentMonitor(args);
 
-    g_pKeybindManager->m_mDispatchers["movetoworkspace"](args);
+    g_pKeybindManager->m_dispatchers["movetoworkspace"](args);
     return {};
 }
 
@@ -179,7 +179,7 @@ SDispatchResult moveToWorkspaceSilent(std::string args) {
     else
         args = getWorkspaceOnCurrentMonitor(args);
 
-    g_pKeybindManager->m_mDispatchers["movetoworkspacesilent"](args);
+    g_pKeybindManager->m_dispatchers["movetoworkspacesilent"](args);
     return {};
 }
 
@@ -199,7 +199,7 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
     if (!PWORKSPACEA || !valid(PWORKSPACEA) || !PWORKSPACEB || !valid(PWORKSPACEB))
         return {};
 
-    const auto LAYOUTNAME = g_pLayoutManager->m_vLayouts[g_pLayoutManager->m_iCurrentLayoutID].first;
+    const auto LAYOUTNAME = g_pLayoutManager->m_layouts[g_pLayoutManager->m_currentLayoutID].first;
 
     // with known layouts, swap the workspaces between monitors, then fix the layout
     // with an unknown layout (eg from a plugin) do a "dumb" swap by moving the windows between the workspaces.
@@ -274,7 +274,7 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
         // fix the layout nodes
         if (LAYOUTNAME == "dwindle") {
             const auto LAYOUT = (CHyprDwindleLayout*)g_pLayoutManager->getCurrentLayout();
-            for (auto& n : LAYOUT->m_lDwindleNodesData) {
+            for (auto& n : LAYOUT->m_dwindleNodesData) {
                 if (n.workspaceID == PWORKSPACEA->m_id)
                     n.workspaceID = PWORKSPACEB->m_id;
                 else if (n.workspaceID == PWORKSPACEB->m_id)
@@ -282,7 +282,7 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
             }
         } else if (LAYOUTNAME == "master") {
             const auto LAYOUT = (CHyprMasterLayout*)g_pLayoutManager->getCurrentLayout();
-            for (auto& n : LAYOUT->m_lMasterNodesData) {
+            for (auto& n : LAYOUT->m_masterNodesData) {
                 if (n.workspaceID == PWORKSPACEA->m_id)
                     n.workspaceID = PWORKSPACEB->m_id;
                 else if (n.workspaceID == PWORKSPACEB->m_id)
@@ -370,7 +370,7 @@ SDispatchResult grabRogueWindows(std::string args) {
         if (!inGoodWorkspace) {
             Debug::log(LOG, "[hyprsplit] moving window {} to workspace {}", w->m_title, PWORKSPACE->m_id);
             const auto args = std::format("{},address:0x{:x}", PWORKSPACE->m_id, (uintptr_t)w.get());
-            g_pKeybindManager->m_mDispatchers["movetoworkspacesilent"](args);
+            g_pKeybindManager->m_dispatchers["movetoworkspacesilent"](args);
         }
     }
     return {};
