@@ -206,7 +206,7 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
     if (LAYOUTNAME == "dwindle" || LAYOUTNAME == "master" || LAYOUTNAME == "hy3") {
         // proceed as Hyprland normally would (see CCompositor::swapActiveWorkspaces)
         PWORKSPACEA->m_monitor = PMON2;
-        PWORKSPACEA->m_events.monitorChange.emit();
+        PWORKSPACEA->m_events.monitorChanged.emit();
 
         for (auto& w :g_pCompositor->m_windows) {
             if (w->m_workspace == PWORKSPACEA) {
@@ -231,7 +231,7 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
         }
 
         PWORKSPACEB->m_monitor = PMON1;
-        PWORKSPACEB->m_events.monitorChange.emit();
+        PWORKSPACEB->m_events.monitorChanged.emit();
 
         for (auto& w :g_pCompositor->m_windows) {
             if (w->m_workspace == PWORKSPACEB) {
