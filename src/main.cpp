@@ -106,14 +106,13 @@ void ensureGoodWorkspaces() {
         const int MIN = m->m_id * (**NUMWORKSPACES) + 1;
         const int MAX = (m->m_id + 1) * (**NUMWORKSPACES);
 
-        for (const auto& ws : g_pCompositor->getWorkspaces()) {
-            if (!valid(ws.lock()))
+        for (const auto& ws : g_pCompositor->getWorkspacesCopy()) {
+            if (!valid(ws))
                 continue;
 
             if (ws->monitorID() != m->m_id && ws->m_id >= MIN && ws->m_id <= MAX) {
                 Debug::log(LOG, "[hyprsplit] workspace {} on monitor {} move to {} {}", ws->m_id, ws->monitorID(), m->m_name, m->m_id);
-                const auto& w = g_pCompositor->getWorkspaceByID(ws->m_id);
-                g_pCompositor->moveWorkspaceToMonitor(w, m);
+                g_pCompositor->moveWorkspaceToMonitor(ws, m);
             }
         }
 
