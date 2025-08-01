@@ -9,5 +9,5 @@ all:
 clean:
 	rm ./$(TARGET)
 
-withhyprpmheaders: export PKG_CONFIG_PATH = $(XDG_DATA_HOME)/hyprpm/headersRoot/share/pkgconfig
+withhyprpmheaders: export PKG_CONFIG_PATH = /var/cache/hyprpm/$(USER)/headersRoot/share/pkgconfig
 withhyprpmheaders: all
