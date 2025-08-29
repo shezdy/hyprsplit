@@ -8,6 +8,7 @@
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/config/ConfigManager.hpp>
 #include <hyprland/src/helpers/Monitor.hpp>
+#include <hyprland/src/managers/animation/DesktopAnimationManager.hpp>
 #include <hyprland/src/managers/EventManager.hpp>
 #include <hyprland/src/managers/HookSystemManager.hpp>
 #include <hyprland/src/managers/LayoutManager.hpp>
@@ -309,8 +310,10 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
         g_pLayoutManager->getCurrentLayout()->recalculateMonitor(PMON1->m_id);
         g_pLayoutManager->getCurrentLayout()->recalculateMonitor(PMON2->m_id);
 
-        g_pCompositor->updateFullscreenFadeOnWorkspace(PWORKSPACEA);
-        g_pCompositor->updateFullscreenFadeOnWorkspace(PWORKSPACEB);
+        g_pDesktopAnimationManager->setFullscreenFadeAnimation(
+            PWORKSPACEB, PWORKSPACEB->m_hasFullscreenWindow ? CDesktopAnimationManager::ANIMATION_TYPE_IN : CDesktopAnimationManager::ANIMATION_TYPE_OUT);
+        g_pDesktopAnimationManager->setFullscreenFadeAnimation(
+            PWORKSPACEA, PWORKSPACEA->m_hasFullscreenWindow ? CDesktopAnimationManager::ANIMATION_TYPE_IN : CDesktopAnimationManager::ANIMATION_TYPE_OUT);
 
         // instead of moveworkspace events, we should send movewindow events
         for (auto& w : g_pCompositor->m_windows) {
