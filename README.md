@@ -50,7 +50,8 @@ Some of Hyprland's workspace parameters are treated differently by the plugin's 
 -  `1`,`2`, or `3`: number on current monitor
 -  `+1` or `-1`: relative on current monitor, no looping
 -  `r+1` or `r-1`: relative on current monitor, with looping
--  `e+1`, `e-1`: relative on current monitor, excluding empty workspaces, same as m+1
+-  `e+1`, `e-1`: relative on current monitor, excluding empty workspaces, no looping
+-  `m+1`, `m-1`: relative on current monitor, excluding empty workspaces, with looping
 - `empty`: empty workspace on current monitor
 
 All other workspace params will be treated the same as however Hyprland normally treats them.

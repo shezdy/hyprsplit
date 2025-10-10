@@ -49,7 +49,35 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
         if (wsID <= 0)
             wsID = ((((wsID - 1) % **NUMWORKSPACES) + **NUMWORKSPACES) % **NUMWORKSPACES) + 1;
     } else if (workspace[0] == 'e' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
-        return "m" + workspace.substr(1);
+        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), 0);
+
+        if (!PLUSMINUSRESULT.has_value())
+            return workspace;
+
+        const int PLUSMINUSVALUE = (int)PLUSMINUSRESULT.value();
+
+        std::vector<WORKSPACEID> validWSes;
+        for (auto const& ws : g_pCompositor->getWorkspaces()) {
+            if (ws->m_isSpecialWorkspace || ws->m_monitor != g_pCompositor->m_lastMonitor)
+                continue;
+
+            validWSes.push_back(ws->m_id);
+        }
+        std::ranges::sort(validWSes);
+
+        auto findResult = std::ranges::find(validWSes.begin(), validWSes.end(), g_pCompositor->m_lastMonitor->activeWorkspaceID());
+        if (findResult == validWSes.end())
+            return workspace;
+        size_t current = findResult - validWSes.begin();
+
+        int resultIndex = current + PLUSMINUSVALUE;
+        if (resultIndex < 0)
+            resultIndex = 0;
+        else if ((size_t)resultIndex >= validWSes.size())
+            resultIndex = validWSes.size() - 1;
+        WORKSPACEID result = validWSes[resultIndex];
+
+        return std::to_string(result);
     } else if (workspace.starts_with("empty")) {
         int i = 0;
         while (++i <= **NUMWORKSPACES) {
