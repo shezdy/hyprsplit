@@ -6,6 +6,7 @@
 
 #define private public
 #include <hyprland/src/Compositor.hpp>
+#include <src/desktop/state/FocusState.hpp>
 #include <hyprland/src/config/ConfigManager.hpp>
 #include <hyprland/src/helpers/Monitor.hpp>
 #include <hyprland/src/managers/animation/DesktopAnimationManager.hpp>
@@ -18,7 +19,7 @@
 using namespace Hyprutils::String;
 
 std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
-    if (!g_pCompositor->m_lastMonitor) {
+    if (!Desktop::focusState()->monitor()) {
         Debug::log(ERR, "[hyprsplit] no monitor in getWorkspaceOnCurrentMonitor?");
         return workspace;
     }
@@ -27,7 +28,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
 
     if (workspace[0] == '+' || workspace[0] == '-') {
-        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, ((g_pCompositor->m_lastMonitor->activeWorkspaceID() - 1) % **NUMWORKSPACES) + 1);
+        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, ((Desktop::focusState()->monitor()->activeWorkspaceID() - 1) % **NUMWORKSPACES) + 1);
 
         if (!PLUSMINUSRESULT.has_value())
             return workspace;
@@ -39,7 +40,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     } else if (isNumber(workspace)) {
         wsID = std::max(std::stoi(workspace), 1);
     } else if (workspace[0] == 'r' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
-        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), g_pCompositor->m_lastMonitor->activeWorkspaceID());
+        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), Desktop::focusState()->monitor()->activeWorkspaceID());
 
         if (!PLUSMINUSRESULT.has_value())
             return workspace;
@@ -58,14 +59,14 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
 
         std::vector<WORKSPACEID> validWSes;
         for (auto const& ws : g_pCompositor->getWorkspaces()) {
-            if (ws->m_isSpecialWorkspace || ws->m_monitor != g_pCompositor->m_lastMonitor)
+            if (ws->m_isSpecialWorkspace || ws->m_monitor != Desktop::focusState()->monitor())
                 continue;
 
             validWSes.push_back(ws->m_id);
         }
         std::ranges::sort(validWSes);
 
-        auto findResult = std::ranges::find(validWSes.begin(), validWSes.end(), g_pCompositor->m_lastMonitor->activeWorkspaceID());
+        auto findResult = std::ranges::find(validWSes.begin(), validWSes.end(), Desktop::focusState()->monitor()->activeWorkspaceID());
         if (findResult == validWSes.end())
             return workspace;
         size_t current = findResult - validWSes.begin();
@@ -81,7 +82,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     } else if (workspace.starts_with("empty")) {
         int i = 0;
         while (++i <= **NUMWORKSPACES) {
-            const int  id         = g_pCompositor->m_lastMonitor->m_id * (**NUMWORKSPACES) + i;
+            const int  id         = Desktop::focusState()->monitor()->m_id * (**NUMWORKSPACES) + i;
             const auto PWORKSPACE = g_pCompositor->getWorkspaceByID(id);
 
             if (!PWORKSPACE || (PWORKSPACE->getWindows() == 0))
@@ -89,7 +90,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
         }
 
         Debug::log(LOG, "[hyprsplit] no empty workspace on monitor");
-        return std::to_string(g_pCompositor->m_lastMonitor->activeWorkspaceID());
+        return std::to_string(Desktop::focusState()->monitor()->activeWorkspaceID());
     } else {
         return workspace;
     }
@@ -97,7 +98,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     if (wsID > **NUMWORKSPACES)
         wsID = ((wsID - 1) % **NUMWORKSPACES) + 1;
 
-    return std::to_string(g_pCompositor->m_lastMonitor->m_id * (**NUMWORKSPACES) + wsID);
+    return std::to_string(Desktop::focusState()->monitor()->m_id * (**NUMWORKSPACES) + wsID);
 }
 
 void ensureGoodWorkspaces() {
@@ -169,7 +170,7 @@ void ensureGoodWorkspaces() {
 }
 
 SDispatchResult focusWorkspace(std::string args) {
-    const auto PCURRMONITOR = g_pCompositor->m_lastMonitor;
+    const auto PCURRMONITOR = Desktop::focusState()->monitor();
 
     if (!PCURRMONITOR) {
         Debug::log(ERR, "[hyprsplit] focusWorkspace: monitor doesn't exist");
@@ -382,7 +383,7 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
 }
 
 SDispatchResult grabRogueWindows(std::string args) {
-    const auto PWORKSPACE = g_pCompositor->m_lastMonitor->m_activeWorkspace;
+    const auto PWORKSPACE = Desktop::focusState()->monitor()->m_activeWorkspace;
 
     if (!PWORKSPACE) {
         Debug::log(ERR, "[hyprsplit] no active workspace?");
