@@ -314,10 +314,10 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
         if (LAYOUTNAME == "dwindle") {
             const auto LAYOUT = (CHyprDwindleLayout*)g_pLayoutManager->getCurrentLayout();
             for (auto& n : LAYOUT->m_dwindleNodesData) {
-                if (n.workspaceID == PWORKSPACEA->m_id)
-                    n.workspaceID = PWORKSPACEB->m_id;
-                else if (n.workspaceID == PWORKSPACEB->m_id)
-                    n.workspaceID = PWORKSPACEA->m_id;
+                if (n->workspaceID == PWORKSPACEA->m_id)
+                    n->workspaceID = PWORKSPACEB->m_id;
+                else if (n->workspaceID == PWORKSPACEB->m_id)
+                    n->workspaceID = PWORKSPACEA->m_id;
             }
         } else if (LAYOUTNAME == "master") {
             const auto LAYOUT = (CHyprMasterLayout*)g_pLayoutManager->getCurrentLayout();
