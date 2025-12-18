@@ -2,25 +2,26 @@
 #include <algorithm>
 #include <hyprland/src/includes.hpp>
 #include <hyprutils/string/String.hpp>
+#include <sstream>
 #include <string>
 
 #define private public
 #include <hyprland/src/Compositor.hpp>
-#include <src/desktop/state/FocusState.hpp>
 #include <hyprland/src/config/ConfigManager.hpp>
+#include <hyprland/src/desktop/state/FocusState.hpp>
 #include <hyprland/src/helpers/Monitor.hpp>
 #include <hyprland/src/managers/animation/DesktopAnimationManager.hpp>
 #include <hyprland/src/managers/EventManager.hpp>
 #include <hyprland/src/managers/HookSystemManager.hpp>
-#include <hyprland/src/managers/LayoutManager.hpp>
 #include <hyprland/src/managers/input/InputManager.hpp>
+#include <hyprland/src/managers/LayoutManager.hpp>
 #undef private
 
 using namespace Hyprutils::String;
 
 std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     if (!Desktop::focusState()->monitor()) {
-        Debug::log(ERR, "[hyprsplit] no monitor in getWorkspaceOnCurrentMonitor?");
+        Log::logger->log(Log::ERR, "[hyprsplit] no monitor in getWorkspaceOnCurrentMonitor?");
         return workspace;
     }
 
@@ -55,7 +56,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
         if (!PLUSMINUSRESULT.has_value())
             return workspace;
 
-        const int PLUSMINUSVALUE = (int)PLUSMINUSRESULT.value();
+        const int                PLUSMINUSVALUE = (int)PLUSMINUSRESULT.value();
 
         std::vector<WORKSPACEID> validWSes;
         for (auto const& ws : g_pCompositor->getWorkspaces()) {
@@ -71,7 +72,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
             return workspace;
         size_t current = findResult - validWSes.begin();
 
-        int resultIndex = current + PLUSMINUSVALUE;
+        int    resultIndex = current + PLUSMINUSVALUE;
         if (resultIndex < 0)
             resultIndex = 0;
         else if ((size_t)resultIndex >= validWSes.size())
@@ -89,7 +90,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
                 return std::to_string(id);
         }
 
-        Debug::log(LOG, "[hyprsplit] no empty workspace on monitor");
+        Log::logger->log(Log::DEBUG, "[hyprsplit] no empty workspace on monitor");
         return std::to_string(Desktop::focusState()->monitor()->activeWorkspaceID());
     } else {
         return workspace;
@@ -116,7 +117,7 @@ void ensureGoodWorkspaces() {
         const int MAX = (m->m_id + 1) * (**NUMWORKSPACES);
 
         if (m->activeWorkspaceID() < MIN || m->activeWorkspaceID() > MAX) {
-            Debug::log(LOG, "[hyprsplit] {} {} active workspace {} out of bounds, changing workspace to {}", m->m_name, m->m_id, m->activeWorkspaceID(), MIN);
+            Log::logger->log(Log::DEBUG, "[hyprsplit] {} {} active workspace {} out of bounds, changing workspace to {}", m->m_name, m->m_id, m->activeWorkspaceID(), MIN);
             auto ws = g_pCompositor->getWorkspaceByID(MIN);
 
             if (!ws) {
@@ -141,7 +142,7 @@ void ensureGoodWorkspaces() {
                 continue;
 
             if (ws->monitorID() != m->m_id && ws->m_id >= MIN && ws->m_id <= MAX) {
-                Debug::log(LOG, "[hyprsplit] workspace {} on monitor {} move to {} {}", ws->m_id, ws->monitorID(), m->m_name, m->m_id);
+                Log::logger->log(Log::DEBUG, "[hyprsplit] workspace {} on monitor {} move to {} {}", ws->m_id, ws->monitorID(), m->m_name, m->m_id);
                 g_pCompositor->moveWorkspaceToMonitor(ws, m);
             }
         }
@@ -173,14 +174,14 @@ SDispatchResult focusWorkspace(std::string args) {
     const auto PCURRMONITOR = Desktop::focusState()->monitor();
 
     if (!PCURRMONITOR) {
-        Debug::log(ERR, "[hyprsplit] focusWorkspace: monitor doesn't exist");
+        Log::logger->log(Log::ERR, "[hyprsplit] focusWorkspace: monitor doesn't exist");
         return {.success = false, .error = "focusWorkspace: monitor doesn't exist"};
     }
 
     const int WORKSPACEID = getWorkspaceIDNameFromString(getWorkspaceOnCurrentMonitor(args)).id;
 
     if (WORKSPACEID == WORKSPACE_INVALID) {
-        Debug::log(ERR, "[hyprsplit] focusWorkspace: invalid workspace");
+        Log::logger->log(Log::ERR, "[hyprsplit] focusWorkspace: invalid workspace");
         return {.success = false, .error = "focusWorkspace: invalid workspace"};
     }
 
@@ -195,7 +196,7 @@ SDispatchResult focusWorkspace(std::string args) {
     const int          MIN           = PCURRMONITOR->m_id * (**NUMWORKSPACES) + 1;
     const int          MAX           = (PCURRMONITOR->m_id + 1) * (**NUMWORKSPACES);
     if (PWORKSPACE->monitorID() != PCURRMONITOR->m_id && (WORKSPACEID >= MIN && WORKSPACEID <= MAX)) {
-        Debug::log(WARN, "[hyprsplit] focusWorkspace: workspace exists but is on the wrong monitor?");
+        Log::logger->log(Log::WARN, "[hyprsplit] focusWorkspace: workspace exists but is on the wrong monitor?");
         ensureGoodWorkspaces();
     }
     g_pKeybindManager->m_dispatchers["workspace"](PWORKSPACE->getConfigName());
@@ -386,7 +387,7 @@ SDispatchResult grabRogueWindows(std::string args) {
     const auto PWORKSPACE = Desktop::focusState()->monitor()->m_activeWorkspace;
 
     if (!PWORKSPACE) {
-        Debug::log(ERR, "[hyprsplit] no active workspace?");
+        Log::logger->log(Log::ERR, "[hyprsplit] no active workspace?");
         return {.success = false, .error = "no active workspace?"};
     }
 
@@ -409,7 +410,7 @@ SDispatchResult grabRogueWindows(std::string args) {
         }
 
         if (!inGoodWorkspace) {
-            Debug::log(LOG, "[hyprsplit] moving window {} to workspace {}", w->m_title, PWORKSPACE->m_id);
+            Log::logger->log(Log::DEBUG, "[hyprsplit] moving window {} to workspace {}", w->m_title, PWORKSPACE->m_id);
             const auto args = std::format("{},address:0x{:x}", PWORKSPACE->m_id, (uintptr_t)w.get());
             g_pKeybindManager->m_dispatchers["movetoworkspacesilent"](args);
         }
@@ -418,13 +419,13 @@ SDispatchResult grabRogueWindows(std::string args) {
 }
 
 void onMonitorAdded(PHLMONITOR pMonitor) {
-    Debug::log(LOG, "[hyprsplit] monitor added {}", pMonitor->m_name);
+    Log::logger->log(Log::DEBUG, "[hyprsplit] monitor added {}", pMonitor->m_name);
 
     ensureGoodWorkspaces();
 }
 
 void onMonitorRemoved(PHLMONITOR pMonitor) {
-    Debug::log(LOG, "[hyprsplit] monitor removed {}", pMonitor->m_name);
+    Log::logger->log(Log::DEBUG, "[hyprsplit] monitor removed {}", pMonitor->m_name);
 
     static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
     static auto* const PERSISTENT    = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:persistent_workspaces")->getDataStaticPtr();
@@ -483,12 +484,12 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     HyprlandAPI::reloadConfig();
 
-    Debug::log(LOG, "[hyprsplit] plugin init");
+    Log::logger->log(Log::DEBUG, "[hyprsplit] plugin init");
     return {"hyprsplit", "split monitor workspaces", "shezdy", "1.0"};
 }
 
 APICALL EXPORT void PLUGIN_EXIT() {
-    Debug::log(LOG, "[hyprsplit] plugin exit");
+    Log::logger->log(Log::DEBUG, "[hyprsplit] plugin exit");
 
     static auto* const PERSISTENT = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:persistent_workspaces")->getDataStaticPtr();
     if (**PERSISTENT) {
