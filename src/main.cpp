@@ -1,5 +1,6 @@
 #include "globals.hpp"
 #include <algorithm>
+#include <cstddef>
 #include <hyprland/src/includes.hpp>
 #include <hyprutils/string/String.hpp>
 #include <sstream>
@@ -8,6 +9,7 @@
 #define private public
 #include <hyprland/src/Compositor.hpp>
 #include <hyprland/src/config/ConfigManager.hpp>
+#include <hyprland/src/desktop/history/WorkspaceHistoryTracker.hpp>
 #include <hyprland/src/desktop/state/FocusState.hpp>
 #include <hyprland/src/helpers/Monitor.hpp>
 #include <hyprland/src/managers/animation/DesktopAnimationManager.hpp>
@@ -307,9 +309,22 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
         PWORKSPACEB->m_name = TMPNAME;
 
         // swap previous workspaces
-        const auto TMPPREV           = PWORKSPACEA->m_prevWorkspace;
-        PWORKSPACEA->m_prevWorkspace = PWORKSPACEB->m_prevWorkspace;
-        PWORKSPACEB->m_prevWorkspace = TMPPREV;
+        Desktop::History::workspaceTracker()->gc();
+
+        auto workspacePrevDataA = Desktop::History::workspaceTracker()->dataFor(PWORKSPACEA);
+        auto workspacePrevDataB = Desktop::History::workspaceTracker()->dataFor(PWORKSPACEB);
+
+        auto  tmpPrevData = workspacePrevDataA;
+
+        workspacePrevDataA.previous     = workspacePrevDataB.previous;
+        workspacePrevDataA.previousName = workspacePrevDataB.previousName;
+        workspacePrevDataA.previousID   = workspacePrevDataB.previousID;
+        workspacePrevDataA.previousMon  = workspacePrevDataB.previousMon;
+
+        workspacePrevDataB.previous     = tmpPrevData.previous;
+        workspacePrevDataB.previousName = tmpPrevData.previousName;
+        workspacePrevDataB.previousID   = tmpPrevData.previousID;
+        workspacePrevDataB.previousMon  = tmpPrevData.previousMon;
 
         // fix the layout nodes
         if (LAYOUTNAME == "dwindle") {
