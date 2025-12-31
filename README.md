@@ -82,4 +82,10 @@ bind = SUPER SHIFT, 6, split:movetoworkspacesilent, 6
 
 bind = SUPER, D, split:swapactiveworkspaces, current +1
 bind = SUPER, G, split:grabroguewindows
+
+# Only bind if hyprsplit plugin is loaded, requires Hyprland >= v0.51.0
+# hyprlang if HYPRSPLIT
+bind = SUPER CONTROL, 1, split:movetoworkspace, 1
+# hyprlang endif
+
 ```

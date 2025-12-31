@@ -455,6 +455,22 @@ void onMonitorRemoved(PHLMONITOR pMonitor) {
     }
 }
 
+static std::vector<const char*> HYPRSPLIT_VERSION_VARS = {
+    "HYPRSPLIT",
+};
+
+static void exportHyprSplitVersionEnv() {
+    for (const auto& v : HYPRSPLIT_VERSION_VARS) {
+        setenv(v, "1", 1);
+    }
+}
+
+static void clearHyprSplitVersionEnv() {
+    for (const auto& v : HYPRSPLIT_VERSION_VARS) {
+        unsetenv(v);
+    }
+}
+
 // other plugins can use this to convert a regular hyprland workspace string the correct hyprsplit one
 APICALL EXPORT std::string hyprsplitGetWorkspace(const std::string& workspace) {
     return getWorkspaceOnCurrentMonitor(workspace);
@@ -496,6 +512,10 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         HyprlandAPI::registerCallbackDynamic(PHANDLE, "monitorRemoved", [&](void* self, SCallbackInfo& info, std::any data) { onMonitorRemoved(std::any_cast<PHLMONITOR>(data)); });
     static auto configReloadedHook =
         HyprlandAPI::registerCallbackDynamic(PHANDLE, "configReloaded", [&](void* self, SCallbackInfo& info, std::any data) { ensureGoodWorkspaces(); });
+    static auto preConfigReloadSetEnvHook =
+        HyprlandAPI::registerCallbackDynamic(PHANDLE, "preConfigReload", [&](void* self, SCallbackInfo& info, std::any data) { exportHyprSplitVersionEnv(); });
+    static auto configReloadedRemoveEnvHook =
+        HyprlandAPI::registerCallbackDynamic(PHANDLE, "configReloaded", [&](void* self, SCallbackInfo& info, std::any data) { clearHyprSplitVersionEnv(); });
 
     HyprlandAPI::reloadConfig();
 
