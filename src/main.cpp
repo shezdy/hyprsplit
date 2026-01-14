@@ -17,9 +17,13 @@
 #include <hyprland/src/managers/HookSystemManager.hpp>
 #include <hyprland/src/managers/input/InputManager.hpp>
 #include <hyprland/src/managers/LayoutManager.hpp>
+#include <hyprland/src/plugins/HookSystem.hpp>
 #undef private
 
 using namespace Hyprutils::String;
+
+static CFunctionHook* g_pGetWorkspaceIDNameFromStringHook = nullptr;
+typedef SWorkspaceIDName (*origGetWorkspaceIDNameFromString)(const std::string&);
 
 std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     if (!Desktop::focusState()->monitor()) {
@@ -42,16 +46,24 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
             wsID = **NUMWORKSPACES;
     } else if (isNumber(workspace)) {
         wsID = std::max(std::stoi(workspace), 1);
-    } else if (workspace[0] == 'r' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
-        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), Desktop::focusState()->monitor()->activeWorkspaceID());
+    } else if ((workspace[0] == 'r' || workspace[0] == 'm') && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
+        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), 0);
 
         if (!PLUSMINUSRESULT.has_value())
             return workspace;
 
-        wsID = (int)PLUSMINUSRESULT.value();
+        int delta = (int)PLUSMINUSRESULT.value();
 
-        if (wsID <= 0)
-            wsID = ((((wsID - 1) % **NUMWORKSPACES) + **NUMWORKSPACES) % **NUMWORKSPACES) + 1;
+        int currentGlobal = Desktop::focusState()->monitor()->activeWorkspaceID();
+        int num           = **NUMWORKSPACES;
+        int currentLocal  = ((currentGlobal - 1) % num) + 1;
+
+        wsID = currentLocal + delta;
+
+        if (wsID > num)
+            wsID = num;
+        if (wsID < 1)
+            wsID = 1;
     } else if (workspace[0] == 'e' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
         const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), 0);
 
@@ -98,10 +110,19 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
         return workspace;
     }
 
+    // Fallback
     if (wsID > **NUMWORKSPACES)
         wsID = ((wsID - 1) % **NUMWORKSPACES) + 1;
 
     return std::to_string(Desktop::focusState()->monitor()->m_id * (**NUMWORKSPACES) + wsID);
+}
+
+SWorkspaceIDName hkGetWorkspaceIDNameFromString(const std::string& args) {
+    if (args.starts_with("m+") || args.starts_with("m-") || args.starts_with("r+") || args.starts_with("r-")) {
+        std::string newArgs = getWorkspaceOnCurrentMonitor(args);
+        return ((origGetWorkspaceIDNameFromString)g_pGetWorkspaceIDNameFromStringHook->m_original)(newArgs);
+    }
+    return ((origGetWorkspaceIDNameFromString)g_pGetWorkspaceIDNameFromStringHook->m_original)(args);
 }
 
 void ensureGoodWorkspaces() {
@@ -314,7 +335,7 @@ SDispatchResult swapActiveWorkspaces(std::string args) {
         auto workspacePrevDataA = Desktop::History::workspaceTracker()->dataFor(PWORKSPACEA);
         auto workspacePrevDataB = Desktop::History::workspaceTracker()->dataFor(PWORKSPACEB);
 
-        auto  tmpPrevData = workspacePrevDataA;
+        auto tmpPrevData = workspacePrevDataA;
 
         workspacePrevDataA.previous     = workspacePrevDataB.previous;
         workspacePrevDataA.previousName = workspacePrevDataB.previousName;
@@ -506,6 +527,9 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     HyprlandAPI::addDispatcherV2(PHANDLE, "split:swapactiveworkspaces", swapActiveWorkspaces);
     HyprlandAPI::addDispatcherV2(PHANDLE, "split:grabroguewindows", grabRogueWindows);
 
+    g_pGetWorkspaceIDNameFromStringHook = HyprlandAPI::createFunctionHook(PHANDLE, (void*)&getWorkspaceIDNameFromString, (void*)&hkGetWorkspaceIDNameFromString);
+    g_pGetWorkspaceIDNameFromStringHook->hook();
+
     static auto monitorAddedHook =
         HyprlandAPI::registerCallbackDynamic(PHANDLE, "monitorAdded", [&](void* self, SCallbackInfo& info, std::any data) { onMonitorAdded(std::any_cast<PHLMONITOR>(data)); });
     static auto monitorRemovedHook =
@@ -525,6 +549,10 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
 APICALL EXPORT void PLUGIN_EXIT() {
     Log::logger->log(Log::DEBUG, "[hyprsplit] plugin exit");
+
+    if (g_pGetWorkspaceIDNameFromStringHook) {
+        g_pGetWorkspaceIDNameFromStringHook->unhook();
+    }
 
     static auto* const PERSISTENT = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:persistent_workspaces")->getDataStaticPtr();
     if (**PERSISTENT) {
