@@ -46,7 +46,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
             wsID = **NUMWORKSPACES;
     } else if (isNumber(workspace)) {
         wsID = std::max(std::stoi(workspace), 1);
-    } else if ((workspace[0] == 'r' || workspace[0] == 'm') && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
+    } else if (workspace[0] == 'r' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
         const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), 0);
 
         if (!PLUSMINUSRESULT.has_value())
@@ -60,11 +60,12 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
 
         wsID = currentLocal + delta;
 
-        if (wsID > num)
-            wsID = num;
-        if (wsID < 1)
-            wsID = 1;
-    } else if (workspace[0] == 'e' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
+        if (wsID <= 0)
+            wsID = ((((wsID - 1) % num) + num) % num) + 1;
+        else if (wsID > num)
+            wsID = ((wsID - 1) % num) + 1;
+    } else if ((workspace[0] == 'm' || workspace[0] == 'e') && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
+        const bool ON_ALL_MONITORS = workspace[0] == 'e';
         const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), 0);
 
         if (!PLUSMINUSRESULT.has_value())
@@ -74,7 +75,10 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
 
         std::vector<WORKSPACEID> validWSes;
         for (auto const& ws : g_pCompositor->getWorkspaces()) {
-            if (ws->m_isSpecialWorkspace || ws->m_monitor != Desktop::focusState()->monitor())
+            if (ws->m_isSpecialWorkspace)
+                continue;
+
+            if (!ON_ALL_MONITORS && ws->m_monitor != Desktop::focusState()->monitor())
                 continue;
 
             validWSes.push_back(ws->m_id);
@@ -84,15 +88,17 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
         auto findResult = std::ranges::find(validWSes.begin(), validWSes.end(), Desktop::focusState()->monitor()->activeWorkspaceID());
         if (findResult == validWSes.end())
             return workspace;
-        size_t current = findResult - validWSes.begin();
 
+        size_t current     = findResult - validWSes.begin();
         int    resultIndex = current + PLUSMINUSVALUE;
-        if (resultIndex < 0)
-            resultIndex = 0;
-        else if ((size_t)resultIndex >= validWSes.size())
-            resultIndex = validWSes.size() - 1;
-        WORKSPACEID result = validWSes[resultIndex];
+        int    size        = (int)validWSes.size();
 
+        if (size > 0)
+            resultIndex = ((resultIndex % size) + size) % size;
+        else
+            return workspace;
+
+        WORKSPACEID result = validWSes[resultIndex];
         return std::to_string(result);
     } else if (workspace.starts_with("empty")) {
         int i = 0;
@@ -118,7 +124,7 @@ std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
 }
 
 SWorkspaceIDName hkGetWorkspaceIDNameFromString(const std::string& args) {
-    if (args.starts_with("m+") || args.starts_with("m-") || args.starts_with("r+") || args.starts_with("r-")) {
+    if (args.starts_with("m+") || args.starts_with("m-") || args.starts_with("r+") || args.starts_with("r-") || args.starts_with("e+") || args.starts_with("e-")) {
         std::string newArgs = getWorkspaceOnCurrentMonitor(args);
         return ((origGetWorkspaceIDNameFromString)g_pGetWorkspaceIDNameFromStringHook->m_original)(newArgs);
     }
