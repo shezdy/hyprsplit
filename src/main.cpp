@@ -16,6 +16,7 @@
 #include <hyprland/src/managers/EventManager.hpp>
 #include <hyprland/src/managers/HookSystemManager.hpp>
 #include <hyprland/src/managers/input/InputManager.hpp>
+#include <hyprland/src/managers/input/trackpad/gestures/ITrackpadGesture.hpp>
 #include <hyprland/src/managers/LayoutManager.hpp>
 #undef private
 
@@ -455,6 +456,35 @@ void onMonitorRemoved(PHLMONITOR pMonitor) {
     }
 }
 
+inline CFunctionHook* g_pWorkspaceSwipeGestureBeginHook = nullptr;
+typedef void (*origWorkspaceSwipeGestureBegin)(void*, const ITrackpadGesture::STrackpadGestureBegin& e);
+void hkWorkspaceSwipeGestureBegin(void* thisptr, const ITrackpadGesture::STrackpadGestureBegin& e) {
+    Log::logger->log(Log::DEBUG, "[hyprsplit] hook workspace swipe begin");
+    static auto* const NUMWORKSPACES = (Hyprlang::INT* const*)HyprlandAPI::getConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces")->getDataStaticPtr();
+
+    // partial taken from CWorkspaceSwipeGesture::update
+    static auto PSWIPEINVR = CConfigValue<Hyprlang::INT>("gestures:workspace_swipe_invert");
+    int         dir        = e.direction == TRACKPAD_GESTURE_DIR_LEFT ? -1 : 1;
+    if (*PSWIPEINVR)
+        dir = -dir;
+
+    auto      m   = Desktop::focusState()->monitor();
+    const int MIN = m->m_id * (**NUMWORKSPACES) + 1;
+    const int MAX = (m->m_id + 1) * (**NUMWORKSPACES);
+
+    if (m->activeWorkspaceID() == MAX && dir > 0) {
+        Log::logger->log(Log::DEBUG, "[hyprsplit] blocking workspace swipe begin to right on ws {}", m->activeWorkspaceID());
+        return;
+    }
+    if (m->activeWorkspaceID() == MIN && dir < 0) {
+        Log::logger->log(Log::DEBUG, "[hyprsplit] blocking workspace swipe begin to left on ws {}", m->activeWorkspaceID());
+        return;
+    }
+
+    Log::logger->log(Log::DEBUG, "[hyprsplit] calling original workspace swipe begin");
+    return (*(origWorkspaceSwipeGestureBegin)g_pWorkspaceSwipeGestureBeginHook->m_original)(thisptr, e);
+}
+
 static std::vector<const char*> HYPRSPLIT_VERSION_VARS = {
     "HYPRSPLIT",
 };
@@ -516,6 +546,15 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         HyprlandAPI::registerCallbackDynamic(PHANDLE, "preConfigReload", [&](void* self, SCallbackInfo& info, std::any data) { exportHyprSplitVersionEnv(); });
     static auto configReloadedRemoveEnvHook =
         HyprlandAPI::registerCallbackDynamic(PHANDLE, "configReloaded", [&](void* self, SCallbackInfo& info, std::any data) { clearHyprSplitVersionEnv(); });
+
+    static const auto foundBeginFunctions = HyprlandAPI::findFunctionsByName(PHANDLE, "begin");
+    for (auto fun : foundBeginFunctions) {
+        if (fun.signature.find("CWorkspaceSwipeGesture") != std::string::npos) {
+            g_pWorkspaceSwipeGestureBeginHook = HyprlandAPI::createFunctionHook(PHANDLE, fun.address, (void*)&hkWorkspaceSwipeGestureBegin);
+            if (g_pWorkspaceSwipeGestureBeginHook != nullptr && g_pWorkspaceSwipeGestureBeginHook->hook())
+                Log::logger->log(Log::DEBUG, "[hyprsplit] hooked CWorkspaceSwipeGesture::begin", fun.signature);
+        }
+    }
 
     HyprlandAPI::reloadConfig();
 
