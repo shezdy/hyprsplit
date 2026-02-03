@@ -157,7 +157,7 @@ void ensureGoodWorkspaces() {
                 wsRule.workspaceId             = i;
                 wsRule.workspaceName           = wsRule.workspaceString;
                 wsRule.isPersistent            = true;
-                wsRule.monitor                 = std::to_string(m->m_id);
+                wsRule.monitor                 = m->m_name;
                 wsRule.layoutopts["hyprsplit"] = "1";
 
                 const auto IT = std::ranges::find_if(g_pConfigManager->m_workspaceRules,
