@@ -13,11 +13,11 @@
 #include <hyprland/src/config/ConfigManager.hpp>
 #include <hyprland/src/desktop/history/WorkspaceHistoryTracker.hpp>
 #include <hyprland/src/desktop/state/FocusState.hpp>
+#include <hyprland/src/event/EventBus.hpp>
 #include <hyprland/src/helpers/Monitor.hpp>
 #include <hyprland/src/layout/space/Space.hpp>
 #include <hyprland/src/managers/animation/DesktopAnimationManager.hpp>
 #include <hyprland/src/managers/EventManager.hpp>
-#include <hyprland/src/managers/HookSystemManager.hpp>
 #include <hyprland/src/managers/input/InputManager.hpp>
 #include <hyprland/src/managers/input/trackpad/gestures/ITrackpadGesture.hpp>
 #include <hyprland/src/render/Renderer.hpp>
@@ -40,6 +40,22 @@ class MonitorRange {
         return num >= min && num <= max;
     }
 };
+
+static std::vector<const char*> HYPRSPLIT_VERSION_VARS = {
+    "HYPRSPLIT",
+};
+
+static void exportHyprSplitVersionEnv() {
+    for (const auto& v : HYPRSPLIT_VERSION_VARS) {
+        setenv(v, "1", 1);
+    }
+}
+
+static void clearHyprSplitVersionEnv() {
+    for (const auto& v : HYPRSPLIT_VERSION_VARS) {
+        unsetenv(v);
+    }
+}
 
 static std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     if (!Desktop::focusState()->monitor()) {
@@ -362,11 +378,11 @@ static SDispatchResult swapActiveWorkspaces(std::string args) {
         if (w->workspaceID() == PWORKSPACEA->m_id) {
             g_pEventManager->postEvent(SHyprIPCEvent{"movewindow", std::format("{:x},{}", (uintptr_t)w.get(), PWORKSPACEA->m_name)});
             g_pEventManager->postEvent(SHyprIPCEvent{"movewindowv2", std::format("{:x},{},{}", (uintptr_t)w.get(), PWORKSPACEA->m_id, PWORKSPACEA->m_name)});
-            EMIT_HOOK_EVENT("moveWindow", (std::vector<std::any>{w, PWORKSPACEA}));
+            Event::bus()->m_events.window.moveToWorkspace.emit(w, PWORKSPACEA);
         } else if (w->workspaceID() == PWORKSPACEB->m_id) {
             g_pEventManager->postEvent(SHyprIPCEvent{"movewindow", std::format("{:x},{}", (uintptr_t)w.get(), PWORKSPACEB->m_name)});
             g_pEventManager->postEvent(SHyprIPCEvent{"movewindowv2", std::format("{:x},{},{}", (uintptr_t)w.get(), PWORKSPACEB->m_id, PWORKSPACEB->m_name)});
-            EMIT_HOOK_EVENT("moveWindow", (std::vector<std::any>{w, PWORKSPACEB}));
+            Event::bus()->m_events.window.moveToWorkspace.emit(w, PWORKSPACEB);
         }
     }
 
@@ -424,6 +440,15 @@ static void onMonitorRemoved(PHLMONITOR pMonitor) {
     }
 }
 
+static void onConfigReloaded() {
+    clearHyprSplitVersionEnv();
+    ensureGoodWorkspaces();
+}
+
+static void onConfigPreReloaded() {
+    exportHyprSplitVersionEnv();
+}
+
 static inline CFunctionHook* g_pWorkspaceSwipeGestureBeginHook = nullptr;
 typedef void (*origWorkspaceSwipeGestureBegin)(void*, const ITrackpadGesture::STrackpadGestureBegin& e);
 static void hkWorkspaceSwipeGestureBegin(void* thisptr, const ITrackpadGesture::STrackpadGestureBegin& e) {
@@ -449,22 +474,6 @@ static void hkWorkspaceSwipeGestureBegin(void* thisptr, const ITrackpadGesture::
 
     hsLog(DEBUG, "calling original workspace swipe begin");
     return (*(origWorkspaceSwipeGestureBegin)g_pWorkspaceSwipeGestureBeginHook->m_original)(thisptr, e);
-}
-
-static std::vector<const char*> HYPRSPLIT_VERSION_VARS = {
-    "HYPRSPLIT",
-};
-
-static void exportHyprSplitVersionEnv() {
-    for (const auto& v : HYPRSPLIT_VERSION_VARS) {
-        setenv(v, "1", 1);
-    }
-}
-
-static void clearHyprSplitVersionEnv() {
-    for (const auto& v : HYPRSPLIT_VERSION_VARS) {
-        unsetenv(v);
-    }
 }
 
 // other plugins can use this to convert a regular hyprland workspace string the correct hyprsplit one
@@ -502,16 +511,10 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     HyprlandAPI::addDispatcherV2(PHANDLE, "split:swapactiveworkspaces", swapActiveWorkspaces);
     HyprlandAPI::addDispatcherV2(PHANDLE, "split:grabroguewindows", grabRogueWindows);
 
-    static auto monitorAddedHook =
-        HyprlandAPI::registerCallbackDynamic(PHANDLE, "monitorAdded", [&](void* self, SCallbackInfo& info, std::any data) { onMonitorAdded(std::any_cast<PHLMONITOR>(data)); });
-    static auto monitorRemovedHook =
-        HyprlandAPI::registerCallbackDynamic(PHANDLE, "monitorRemoved", [&](void* self, SCallbackInfo& info, std::any data) { onMonitorRemoved(std::any_cast<PHLMONITOR>(data)); });
-    static auto configReloadedHook =
-        HyprlandAPI::registerCallbackDynamic(PHANDLE, "configReloaded", [&](void* self, SCallbackInfo& info, std::any data) { ensureGoodWorkspaces(); });
-    static auto preConfigReloadSetEnvHook =
-        HyprlandAPI::registerCallbackDynamic(PHANDLE, "preConfigReload", [&](void* self, SCallbackInfo& info, std::any data) { exportHyprSplitVersionEnv(); });
-    static auto configReloadedRemoveEnvHook =
-        HyprlandAPI::registerCallbackDynamic(PHANDLE, "configReloaded", [&](void* self, SCallbackInfo& info, std::any data) { clearHyprSplitVersionEnv(); });
+    static auto       monitorAddedListener      = Event::bus()->m_events.monitor.added.listen([&](PHLMONITOR m) { onMonitorAdded(m); });
+    static auto       monitorRemovedListener    = Event::bus()->m_events.monitor.removed.listen([&](PHLMONITOR m) { onMonitorRemoved(m); });
+    static auto       configReloadedListener    = Event::bus()->m_events.config.reloaded.listen([&] { onConfigReloaded(); });
+    static auto       configPreReloadedListener = Event::bus()->m_events.config.preReload.listen([&] { onConfigPreReloaded(); });
 
     static const auto foundBeginFunctions = HyprlandAPI::findFunctionsByName(PHANDLE, "begin");
     for (auto& fun : foundBeginFunctions) {
