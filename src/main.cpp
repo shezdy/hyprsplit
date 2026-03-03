@@ -25,15 +25,162 @@
 
 using namespace Hyprutils::String;
 
+struct MonitorWorkspaceMapping {
+    std::string monitorIdentifier; // "desc:FooBar" or "DP-1"
+    long        min;               // inclusive
+    long        max;               // inclusive
+};
+
+static std::vector<MonitorWorkspaceMapping> g_workspaceMappings;
+
+// Mirrors Hyprland's monitor matching in CConfigManager::getMonitorRuleFor:
+// desc: prefix does substring match against monitor short description,
+// otherwise exact match against monitor name.
+static bool monitorMatchesIdentifier(const PHLMONITOR& monitor, const std::string& identifier) {
+    if (identifier.starts_with("desc:")) {
+        const auto desc = identifier.substr(5);
+        return monitor->m_shortDescription.find(desc) != std::string::npos;
+    }
+    return monitor->m_name == identifier;
+}
+
+static bool rangeOverlaps(long minA, long maxA, long minB, long maxB) {
+    return minA <= maxB && minB <= maxA;
+}
+
+static Hyprlang::CParseResult onWorkspaceMapKeyword(const char* command, const char* value) {
+    Hyprlang::CParseResult result;
+    std::string            val = value;
+
+    // parse "desc:FooBar, 1, 10" or "DP-1, 1, 10"
+    // find last two commas to split min and max, everything before is the identifier
+    auto lastComma = val.find_last_of(',');
+    if (lastComma == std::string::npos) {
+        result.setError("workspace_map: expected format '<monitor>, <min>, <max>'");
+        return result;
+    }
+
+    auto secondLastComma = val.find_last_of(',', lastComma - 1);
+    if (secondLastComma == std::string::npos) {
+        result.setError("workspace_map: expected format '<monitor>, <min>, <max>'");
+        return result;
+    }
+
+    auto identifier = trim(val.substr(0, secondLastComma));
+    auto minStr     = trim(val.substr(secondLastComma + 1, lastComma - secondLastComma - 1));
+    auto maxStr     = trim(val.substr(lastComma + 1));
+
+    if (identifier.empty() || minStr.empty() || maxStr.empty()) {
+        result.setError("workspace_map: empty field in '<monitor>, <min>, <max>'");
+        return result;
+    }
+
+    long min, max;
+    try {
+        min = std::stol(minStr);
+        max = std::stol(maxStr);
+    } catch (...) {
+        result.setError("workspace_map: min and max must be integers");
+        return result;
+    }
+
+    if (min < 1) {
+        result.setError("workspace_map: min must be >= 1");
+        return result;
+    }
+    if (min > max) {
+        result.setError("workspace_map: min must be <= max");
+        return result;
+    }
+
+    // check for overlap with existing mappings
+    for (const auto& mapping : g_workspaceMappings) {
+        if (rangeOverlaps(min, max, mapping.min, mapping.max)) {
+            result.setError(std::format("workspace_map: range {}-{} overlaps with existing mapping for '{}' ({}-{})", min, max, mapping.monitorIdentifier, mapping.min, mapping.max)
+                                .c_str());
+            return result;
+        }
+    }
+
+    g_workspaceMappings.push_back({identifier, min, max});
+    hsLog(DEBUG, "workspace_map: '{}' -> {}-{}", identifier, min, max);
+
+    return result;
+}
+
 class MonitorRange {
   public:
     long min; // min workspace id on monitor (inclusive)
     long max; // max workspace id on monitor (inclusive)
 
     MonitorRange(const PHLMONITOR& monitor) {
+        // check explicit workspace_map entries first
+        for (const auto& mapping : g_workspaceMappings) {
+            if (monitorMatchesIdentifier(monitor, mapping.monitorIdentifier)) {
+                min = mapping.min;
+                max = mapping.max;
+                return;
+            }
+        }
+
+        // fallback: auto-assign a range of num_workspaces that doesn't overlap any explicit mapping.
+        // to keep assignment stable, we determine this monitor's fallback index by sorting all
+        // unmapped monitors by name and finding our position in that sorted order.
         const auto NUMWORKSPACES = CConfigValue<Hyprlang::INT>("plugin:hyprsplit:num_workspaces");
-        min                      = (monitor->m_id * (*NUMWORKSPACES)) + 1;
-        max                      = (monitor->m_id + 1) * (*NUMWORKSPACES);
+
+        std::vector<std::string> unmappedMonitorNames;
+        for (const auto& m : g_pCompositor->m_monitors) {
+            if (m->m_id == MONITOR_INVALID || m->isMirror())
+                continue;
+
+            bool mapped = false;
+            for (const auto& mapping : g_workspaceMappings) {
+                if (monitorMatchesIdentifier(m, mapping.monitorIdentifier)) {
+                    mapped = true;
+                    break;
+                }
+            }
+            if (!mapped)
+                unmappedMonitorNames.push_back(m->m_name);
+        }
+        std::ranges::sort(unmappedMonitorNames);
+
+        int fallbackIndex = 0;
+        for (size_t i = 0; i < unmappedMonitorNames.size(); i++) {
+            if (unmappedMonitorNames[i] == monitor->m_name) {
+                fallbackIndex = i;
+                break;
+            }
+        }
+
+        // find the (fallbackIndex+1)th contiguous block of NUMWORKSPACES that doesn't overlap any mapping
+        long candidateMin = 1;
+        int  found        = 0;
+        while (true) {
+            long candidateMax     = candidateMin + *NUMWORKSPACES - 1;
+            bool overlapsExplicit = false;
+            for (const auto& mapping : g_workspaceMappings) {
+                if (rangeOverlaps(candidateMin, candidateMax, mapping.min, mapping.max)) {
+                    overlapsExplicit = true;
+                    // skip past this mapping
+                    candidateMin = mapping.max + 1;
+                    break;
+                }
+            }
+            if (!overlapsExplicit) {
+                if (found == fallbackIndex) {
+                    min = candidateMin;
+                    max = candidateMax;
+                    return;
+                }
+                found++;
+                candidateMin = candidateMax + 1;
+            }
+        }
+    }
+
+    long size() const {
+        return max - min + 1;
     }
 
     bool contains(const long& num) const {
@@ -63,22 +210,26 @@ static std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
         return workspace;
     }
 
-    int        wsID          = 1;
-    const auto NUMWORKSPACES = CConfigValue<Hyprlang::INT>("plugin:hyprsplit:num_workspaces");
+    const auto MONITOR  = Desktop::focusState()->monitor();
+    const auto RANGE    = MonitorRange(MONITOR);
+    const long RANGESIZE = RANGE.size();
+
+    int wsID = 1;
 
     if (workspace[0] == '+' || workspace[0] == '-') {
-        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, ((Desktop::focusState()->monitor()->activeWorkspaceID() - 1) % *NUMWORKSPACES) + 1);
+        // current workspace as 1-based local index within range
+        const long localCurrent    = ((MONITOR->activeWorkspaceID() - RANGE.min) % RANGESIZE) + 1;
+        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, localCurrent);
 
         if (!PLUSMINUSRESULT.has_value())
             return workspace;
 
         wsID = std::max((int)PLUSMINUSRESULT.value(), 1);
-
-        wsID = std::min(wsID, (int)*NUMWORKSPACES);
+        wsID = std::min(wsID, (int)RANGESIZE);
     } else if (isNumber(workspace)) {
         wsID = std::max(std::stoi(workspace), 1);
     } else if (workspace[0] == 'r' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
-        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), Desktop::focusState()->monitor()->activeWorkspaceID());
+        const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), MONITOR->activeWorkspaceID());
 
         if (!PLUSMINUSRESULT.has_value())
             return workspace;
@@ -86,7 +237,7 @@ static std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
         wsID = (int)PLUSMINUSRESULT.value();
 
         if (wsID <= 0)
-            wsID = ((((wsID - 1) % *NUMWORKSPACES) + *NUMWORKSPACES) % *NUMWORKSPACES) + 1;
+            wsID = ((((wsID - 1) % RANGESIZE) + RANGESIZE) % RANGESIZE) + 1;
     } else if (workspace[0] == 'e' && (workspace[1] == '-' || workspace[1] == '+') && isNumber(workspace.substr(2))) {
         const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace.substr(1), 0);
 
@@ -97,14 +248,14 @@ static std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
 
         std::vector<WORKSPACEID> validWSes;
         for (auto const& ws : g_pCompositor->getWorkspaces()) {
-            if (ws->m_isSpecialWorkspace || ws->m_monitor != Desktop::focusState()->monitor())
+            if (ws->m_isSpecialWorkspace || ws->m_monitor != MONITOR)
                 continue;
 
             validWSes.push_back(ws->m_id);
         }
         std::ranges::sort(validWSes);
 
-        auto findResult = std::ranges::find(validWSes.begin(), validWSes.end(), Desktop::focusState()->monitor()->activeWorkspaceID());
+        auto findResult = std::ranges::find(validWSes.begin(), validWSes.end(), MONITOR->activeWorkspaceID());
         if (findResult == validWSes.end())
             return workspace;
         size_t current = findResult - validWSes.begin();
@@ -118,9 +269,7 @@ static std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
 
         return std::to_string(result);
     } else if (workspace.starts_with("empty")) {
-        int i = 0;
-        while (++i <= *NUMWORKSPACES) {
-            const int  id         = (Desktop::focusState()->monitor()->m_id * (*NUMWORKSPACES)) + i;
+        for (long id = RANGE.min; id <= RANGE.max; id++) {
             const auto PWORKSPACE = g_pCompositor->getWorkspaceByID(id);
 
             if (!PWORKSPACE || (PWORKSPACE->getWindows() == 0))
@@ -128,15 +277,15 @@ static std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
         }
 
         hsLog(DEBUG, "no empty workspace on monitor");
-        return std::to_string(Desktop::focusState()->monitor()->activeWorkspaceID());
+        return std::to_string(MONITOR->activeWorkspaceID());
     } else {
         return workspace;
     }
 
-    if (wsID > *NUMWORKSPACES)
-        wsID = ((wsID - 1) % *NUMWORKSPACES) + 1;
+    if (wsID > RANGESIZE)
+        wsID = ((wsID - 1) % RANGESIZE) + 1;
 
-    return std::to_string((Desktop::focusState()->monitor()->m_id * (*NUMWORKSPACES)) + wsID);
+    return std::to_string(RANGE.min + wsID - 1);
 }
 
 static void ensureGoodWorkspaces() {
@@ -446,6 +595,7 @@ static void onConfigReloaded() {
 }
 
 static void onConfigPreReloaded() {
+    g_workspaceMappings.clear();
     exportHyprSplitVersionEnv();
 }
 
@@ -504,6 +654,7 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces", Hyprlang::INT{10});
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprsplit:persistent_workspaces", Hyprlang::INT{0});
+    HyprlandAPI::addConfigKeyword(PHANDLE, "plugin:hyprsplit:workspace_map", onWorkspaceMapKeyword, Hyprlang::SHandlerOptions{});
 
     HyprlandAPI::addDispatcherV2(PHANDLE, "split:workspace", focusWorkspace);
     HyprlandAPI::addDispatcherV2(PHANDLE, "split:movetoworkspace", moveToWorkspace);
