@@ -36,6 +36,20 @@ Finally add the following to your config  `plugin = /path/to/hyprsplit/hyprsplit
 |---|---|---|---|
 | num_workspaces | Number of workspaces on each monitor | int | 10 |
 | persistent_workspaces | if true, will make workspaces on each monitor persistent (they will always exist and will not be destroyed when empty) | bool | false |
+| force_monitor_priority | if true, the plugin will auto assign workspaces using monitor names in alphabetical order, even when there are no monitor_priorities defined in the config. if false, the plugin will automatically assign workspaces based on monitor id as long as no `monitor_priority keywords are used in the config | bool | false |
+
+### Keywords
+
+| name | description | arguments |
+|---|---|---|
+| monitor_priority | reserves workspaces in order for the listed monitors | comma separated list of monitors, i.e. `DP-1, desc:foobar` |
+
+`monitor_priority` example with `num_workspaces=10` and `plugin:hyprsplit:monitor_priority=HDMI-A-1, DP-1`: monitor HDMI-A-1 will have workspace ids 1-10 reserved for it, DP-1 11-20.
+
+### How workspaces are assigned to monitors
+By default with no config monitor ids will be used to determine the workspaces on each monitor. 
+
+If `force_monitor_priority` is set to true OR if the `monitor_priority` keyword is used in the config, monitors will automatically be assigned workspaces based on the alphabetical order of their names (instead of monitor ids). For example if force_monitor_priority=true, `DP-1` would get lower workspaces ids than `HDMI-A-1`, regardless of monitor ids.
 
 ### Dispatchers
 | Dispatcher | Description | Params |
