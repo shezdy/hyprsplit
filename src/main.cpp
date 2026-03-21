@@ -10,7 +10,8 @@
 
 #define private public
 #include <hyprland/src/Compositor.hpp>
-#include <hyprland/src/config/ConfigManager.hpp>
+#include <hyprland/src/config/shared/workspace/WorkspaceRule.hpp>
+#include <hyprland/src/config/shared/workspace/WorkspaceRuleManager.hpp>
 #include <hyprland/src/desktop/history/WorkspaceHistoryTracker.hpp>
 #include <hyprland/src/desktop/state/FocusState.hpp>
 #include <hyprland/src/event/EventBus.hpp>
@@ -31,7 +32,7 @@ class MonitorRange {
     long max; // max workspace id on monitor (inclusive)
 
     MonitorRange(const PHLMONITOR& monitor) {
-        const auto NUMWORKSPACES = CConfigValue<Hyprlang::INT>("plugin:hyprsplit:num_workspaces");
+        static const auto NUMWORKSPACES = ConfigValue<Hyprlang::INT>("plugin:hyprsplit:num_workspaces");
         min                      = (monitor->m_id * (*NUMWORKSPACES)) + 1;
         max                      = (monitor->m_id + 1) * (*NUMWORKSPACES);
     }
@@ -64,7 +65,7 @@ static std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
     }
 
     int        wsID          = 1;
-    const auto NUMWORKSPACES = CConfigValue<Hyprlang::INT>("plugin:hyprsplit:num_workspaces");
+    static const auto NUMWORKSPACES = ConfigValue<Hyprlang::INT>("plugin:hyprsplit:num_workspaces");
 
     if (workspace[0] == '+' || workspace[0] == '-') {
         const auto PLUSMINUSRESULT = getPlusMinusKeywordResult(workspace, ((Desktop::focusState()->monitor()->activeWorkspaceID() - 1) % *NUMWORKSPACES) + 1);
@@ -143,10 +144,10 @@ static void ensureGoodWorkspaces() {
     if (g_pCompositor->m_unsafeState)
         return;
 
-    const auto PERSISTENT = CConfigValue<Hyprlang::INT>("plugin:hyprsplit:persistent_workspaces");
+    static const auto PERSISTENT = ConfigValue<Hyprlang::INT>("plugin:hyprsplit:persistent_workspaces");
 
     for (auto& m : g_pCompositor->m_monitors) {
-        if (m->m_id == MONITOR_INVALID || m->isMirror())
+        if (!m || m->m_id == MONITOR_INVALID || m->isMirror())
             continue;
 
         const auto RANGE = MonitorRange(m);
@@ -166,7 +167,7 @@ static void ensureGoodWorkspaces() {
     }
 
     for (auto& m : g_pCompositor->m_monitors) {
-        if (m->m_id == MONITOR_INVALID || m->isMirror())
+        if (!m || m->m_id == MONITOR_INVALID || m->isMirror())
             continue;
 
         const auto RANGE = MonitorRange(m);
@@ -183,22 +184,22 @@ static void ensureGoodWorkspaces() {
 
         if (*PERSISTENT) {
             for (auto i = RANGE.min; i <= RANGE.max; i++) {
-                SWorkspaceRule wsRule;
-                wsRule.workspaceString         = std::to_string(i);
-                wsRule.workspaceId             = i;
-                wsRule.workspaceName           = wsRule.workspaceString;
-                wsRule.isPersistent            = true;
-                wsRule.monitor                 = m->m_name;
-                wsRule.layoutopts["hyprsplit"] = "1";
+                Config::CWorkspaceRule wsRule;
+                wsRule.m_workspaceString         = std::to_string(i);
+                wsRule.m_workspaceId             = i;
+                wsRule.m_workspaceName           = wsRule.m_workspaceString;
+                wsRule.m_isPersistent            = true;
+                wsRule.m_monitor                 = m->m_name;
+                wsRule.m_layoutopts["hyprsplit"] = "1";
 
-                const auto IT = std::ranges::find_if(g_pConfigManager->m_workspaceRules,
-                                                     [&](const auto& other) { return other.layoutopts.contains("hyprsplit") && other.workspaceId == wsRule.workspaceId; });
+                const auto IT = std::ranges::find_if(Config::workspaceRuleMgr()->m_rules,
+                                                     [&](const auto& other) { return other.m_layoutopts.contains("hyprsplit") && other.m_workspaceId == wsRule.m_workspaceId; });
 
-                if (IT == g_pConfigManager->m_workspaceRules.end())
-                    g_pConfigManager->m_workspaceRules.emplace_back(wsRule);
+                if (IT == Config::workspaceRuleMgr()->m_rules.end())
+                    Config::workspaceRuleMgr()->m_rules.emplace_back(wsRule);
                 else
-                    IT->monitor = wsRule.monitor;
-                g_pConfigManager->ensurePersistentWorkspacesPresent();
+                    IT->m_monitor = wsRule.m_monitor;
+                g_pCompositor->ensurePersistentWorkspacesPresent(Config::workspaceRuleMgr()->getAllWorkspaceRules());
             }
         }
     }
@@ -430,13 +431,13 @@ static void onMonitorAdded(PHLMONITOR pMonitor) {
 static void onMonitorRemoved(PHLMONITOR pMonitor) {
     hsLog(DEBUG, "monitor removed {}", pMonitor->m_name);
 
-    const auto PERSISTENT = CConfigValue<Hyprlang::INT>("plugin:hyprsplit:persistent_workspaces");
+    static const auto PERSISTENT = ConfigValue<Hyprlang::INT>("plugin:hyprsplit:persistent_workspaces");
 
     if (*PERSISTENT) {
         const auto RANGE = MonitorRange(pMonitor);
 
-        std::erase_if(g_pConfigManager->m_workspaceRules, [&](SWorkspaceRule const& rule) { return rule.layoutopts.contains("hyprsplit") && RANGE.contains(rule.workspaceId); });
-        g_pConfigManager->ensurePersistentWorkspacesPresent();
+        std::erase_if(Config::workspaceRuleMgr()->m_rules, [&](Config::CWorkspaceRule const& rule) { return rule.m_layoutopts.contains("hyprsplit") && RANGE.contains(rule.m_workspaceId); });
+        g_pCompositor->ensurePersistentWorkspacesPresent(Config::workspaceRuleMgr()->getAllWorkspaceRules());
     }
 }
 
@@ -455,7 +456,7 @@ static void hkWorkspaceSwipeGestureBegin(void* thisptr, const ITrackpadGesture::
     hsLog(DEBUG, "hook workspace swipe begin");
 
     // partial taken from CWorkspaceSwipeGesture::update
-    static auto PSWIPEINVR = CConfigValue<Hyprlang::INT>("gestures:workspace_swipe_invert");
+    static auto PSWIPEINVR = ConfigValue<Hyprlang::INT>("gestures:workspace_swipe_invert");
     int         dir        = e.direction == TRACKPAD_GESTURE_DIR_LEFT ? -1 : 1;
     if (*PSWIPEINVR)
         dir = -dir;
@@ -534,9 +535,9 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
 APICALL EXPORT void PLUGIN_EXIT() {
     hsLog(DEBUG, "plugin exit");
 
-    const auto PERSISTENT = CConfigValue<Hyprlang::INT>("plugin:hyprsplit:persistent_workspaces");
+    static const auto PERSISTENT = ConfigValue<Hyprlang::INT>("plugin:hyprsplit:persistent_workspaces");
     if (*PERSISTENT) {
-        std::erase_if(g_pConfigManager->m_workspaceRules, [](SWorkspaceRule const& rule) { return rule.layoutopts.contains("hyprsplit"); });
-        g_pConfigManager->ensurePersistentWorkspacesPresent();
+        std::erase_if(Config::workspaceRuleMgr()->m_rules, [](Config::CWorkspaceRule const& rule) { return rule.m_layoutopts.contains("hyprsplit"); });
+        g_pCompositor->ensurePersistentWorkspacesPresent(Config::workspaceRuleMgr()->getAllWorkspaceRules());
     }
 }
