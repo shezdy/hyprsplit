@@ -75,8 +75,8 @@ class MonitorRange {
         }
 
         static const auto NUMWORKSPACES = ConfigValue<Hyprlang::INT>("plugin:hyprsplit:num_workspaces");
-        min                      = (base * (*NUMWORKSPACES)) + 1;
-        max                      = (base + 1) * (*NUMWORKSPACES);
+        min                             = (base * (*NUMWORKSPACES)) + 1;
+        max                             = (base + 1) * (*NUMWORKSPACES);
     }
 
     bool contains(const long& num) const {
@@ -106,10 +106,10 @@ static std::string getWorkspaceOnCurrentMonitor(const std::string& workspace) {
         return workspace;
     }
 
-    int        wsID          = 1;
+    int               wsID          = 1;
     static const auto NUMWORKSPACES = ConfigValue<Hyprlang::INT>("plugin:hyprsplit:num_workspaces");
-    const auto PMONITOR      = Desktop::focusState()->monitor();
-    const auto RANGE         = MonitorRange(PMONITOR);
+    const auto        PMONITOR      = Desktop::focusState()->monitor();
+    const auto        RANGE         = MonitorRange(PMONITOR);
 
     if (workspace[0] == '+' || workspace[0] == '-') {
         const long LOCALCURRENT    = PMONITOR->activeWorkspaceID() - RANGE.min + 1;
@@ -313,18 +313,12 @@ static SDispatchResult swapActiveWorkspaces(std::string args) {
     if (!PWORKSPACEA || !valid(PWORKSPACEA) || !PWORKSPACEB || !valid(PWORKSPACEB))
         return {};
 
-    // proceed as Hyprland normally would (see CCompositor::swapActiveWorkspaces)
-    PWORKSPACEA->m_monitor = PMON2;
-    PWORKSPACEA->m_events.monitorChanged.emit();
-
+    // move windows
+    // <std::string> fsWindows;
     for (auto& w : g_pCompositor->m_windows) {
         if (w->m_workspace == PWORKSPACEA) {
-            if (w->m_pinned) {
-                w->m_workspace = PWORKSPACEB;
-                continue;
-            }
-
-            w->m_monitor = PMON2;
+            w->m_workspace = PWORKSPACEB;
+            w->m_monitor   = PMON2;
 
             // additionally, move floating and fs windows manually
             if (w->m_isFloating)
@@ -336,20 +330,9 @@ static SDispatchResult swapActiveWorkspaces(std::string args) {
             }
 
             w->updateToplevel();
-        }
-    }
-
-    PWORKSPACEB->m_monitor = PMON1;
-    PWORKSPACEB->m_events.monitorChanged.emit();
-
-    for (auto& w : g_pCompositor->m_windows) {
-        if (w->m_workspace == PWORKSPACEB) {
-            if (w->m_pinned) {
-                w->m_workspace = PWORKSPACEA;
-                continue;
-            }
-
-            w->m_monitor = PMON1;
+        } else if (w->m_workspace == PWORKSPACEB) {
+            w->m_workspace = PWORKSPACEA;
+            w->m_monitor   = PMON1;
 
             // additionally, move floating and fs windows manually
             if (w->m_isFloating)
@@ -364,54 +347,29 @@ static SDispatchResult swapActiveWorkspaces(std::string args) {
         }
     }
 
-    PMON1->m_activeWorkspace = PWORKSPACEB;
-    PMON2->m_activeWorkspace = PWORKSPACEA;
-
-    // swap workspace ids
-    const auto TMPID    = PWORKSPACEA->m_id;
-    const auto TMPNAME  = PWORKSPACEA->m_name;
-    PWORKSPACEA->m_id   = PWORKSPACEB->m_id;
-    PWORKSPACEA->m_name = PWORKSPACEB->m_name;
-    PWORKSPACEB->m_id   = TMPID;
-    PWORKSPACEB->m_name = TMPNAME;
-
-    // swap previous workspaces
-    Desktop::History::workspaceTracker()->gc();
-
-    auto workspacePrevDataA = Desktop::History::workspaceTracker()->dataFor(PWORKSPACEA);
-    auto workspacePrevDataB = Desktop::History::workspaceTracker()->dataFor(PWORKSPACEB);
-
-    auto tmpPrevData = workspacePrevDataA;
-
-    workspacePrevDataA.previous     = workspacePrevDataB.previous;
-    workspacePrevDataA.previousName = workspacePrevDataB.previousName;
-    workspacePrevDataA.previousID   = workspacePrevDataB.previousID;
-    workspacePrevDataA.previousMon  = workspacePrevDataB.previousMon;
-
-    workspacePrevDataB.previous     = tmpPrevData.previous;
-    workspacePrevDataB.previousName = tmpPrevData.previousName;
-    workspacePrevDataB.previousID   = tmpPrevData.previousID;
-    workspacePrevDataB.previousMon  = tmpPrevData.previousMon;
-
     // swap layouts
     auto workspaceLayoutA = PWORKSPACEA->m_space;
     auto workspaceLayoutB = PWORKSPACEB->m_space;
 
-    auto tmpPrevLayout = workspaceLayoutA;
+    workspaceLayoutA->m_parent = PWORKSPACEB;
+    workspaceLayoutB->m_parent = PWORKSPACEA;
 
-    workspaceLayoutA = workspaceLayoutB;
-    workspaceLayoutB = tmpPrevLayout;
+    PWORKSPACEA->m_space = workspaceLayoutB;
+    PWORKSPACEB->m_space = workspaceLayoutA;
 
-    PWORKSPACEA->m_space->recalculate();
-    PWORKSPACEB->m_space->recalculate();
+    PWORKSPACEA->updateWindows();
+    PWORKSPACEB->updateWindows();
+
+    g_layoutManager->recalculateMonitor(PMON1);
+    g_layoutManager->recalculateMonitor(PMON2);
+
+    g_pHyprRenderer->damageMonitor(PMON1);
+    g_pHyprRenderer->damageMonitor(PMON2);
 
     g_pDesktopAnimationManager->setFullscreenFadeAnimation(
         PWORKSPACEB, PWORKSPACEB->m_hasFullscreenWindow ? CDesktopAnimationManager::ANIMATION_TYPE_IN : CDesktopAnimationManager::ANIMATION_TYPE_OUT);
     g_pDesktopAnimationManager->setFullscreenFadeAnimation(
         PWORKSPACEA, PWORKSPACEA->m_hasFullscreenWindow ? CDesktopAnimationManager::ANIMATION_TYPE_IN : CDesktopAnimationManager::ANIMATION_TYPE_OUT);
-
-    g_pHyprRenderer->damageMonitor(PMON1);
-    g_pHyprRenderer->damageMonitor(PMON2);
 
     g_pInputManager->refocus();
 
@@ -477,7 +435,8 @@ static void onMonitorRemoved(PHLMONITOR pMonitor) {
     if (*PERSISTENT) {
         const auto RANGE = MonitorRange(pMonitor);
 
-        std::erase_if(Config::workspaceRuleMgr()->m_rules, [&](Config::CWorkspaceRule const& rule) { return rule.m_layoutopts.contains("hyprsplit") && RANGE.contains(rule.m_workspaceId); });
+        std::erase_if(Config::workspaceRuleMgr()->m_rules,
+                      [&](Config::CWorkspaceRule const& rule) { return rule.m_layoutopts.contains("hyprsplit") && RANGE.contains(rule.m_workspaceId); });
         g_pCompositor->ensurePersistentWorkspacesPresent(Config::workspaceRuleMgr()->getAllWorkspaceRules());
     }
 }
