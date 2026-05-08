@@ -11,6 +11,7 @@
 
 #define private public
 #include <hyprland/src/Compositor.hpp>
+#include <hyprland/src/config/ConfigManager.hpp>
 #include <hyprland/src/config/shared/workspace/WorkspaceRule.hpp>
 #include <hyprland/src/config/shared/workspace/WorkspaceRuleManager.hpp>
 #include <hyprland/src/desktop/history/WorkspaceHistoryTracker.hpp>
@@ -514,6 +515,13 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
         HyprlandAPI::addNotification(PHANDLE, std::format("[hyprsplit] compositor hash: {}", HASH), CHyprColor{1.0, 0.2, 0.2, 1.0}, 5000);
         HyprlandAPI::addNotification(PHANDLE, std::format("[hyprsplit] client hash: {}", CLIENT_HASH), CHyprColor{1.0, 0.2, 0.2, 1.0}, 5000);
         throw std::runtime_error("[hyprsplit] Version mismatch");
+    }
+
+    if (Config::mgr()->type() != Config::CONFIG_LEGACY) {
+        HyprlandAPI::addNotification(PHANDLE, "[hyprsplit] Failure in initialization", CHyprColor{1.0, 0.2, 0.2, 1.0}, 10000);
+        HyprlandAPI::addNotification(PHANDLE, "[hyprsplit] The plugin only supports the legacy config (no lua)", CHyprColor{1.0, 0.2, 0.2, 1.0}, 10000);
+        HyprlandAPI::addNotification(PHANDLE, "[hyprsplit] Please use the lua library instead of the plugin", CHyprColor{1.0, 0.2, 0.2, 1.0}, 10000);
+        throw std::runtime_error("[hyprsplit] Only legacy config supported");
     }
 
     HyprlandAPI::addConfigValue(PHANDLE, "plugin:hyprsplit:num_workspaces", Hyprlang::INT{10});
