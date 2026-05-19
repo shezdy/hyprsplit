@@ -20,3 +20,8 @@ shared_module(meson.project_name(), src,
   ],
   install: true,
 )
+
+install_data(
+  'init.lua',
+  install_dir: get_option('datadir') / 'hyprsplit'
+)
