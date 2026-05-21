@@ -9,6 +9,8 @@ local hyprsplit = {
         force_monitor_priority = false,
     },
     monitor_priority_list = {},
+    ---@type table<string, integer> map monitor name -> previous workspace id
+    prev_workspaces = {},
     dsp = {
         window = {},
         workspace = {},
@@ -209,16 +211,32 @@ function hyprsplit.dsp.focus(args)
         return function()
             local ws_string = hyprsplit.get_workspace_string(workspace_arg)
             local ws = hl.get_workspace(ws_string)
+            local active_monitor = hl.get_active_monitor()
             -- if workspace exists, check that it is on the correct monitor.
             -- if not on the correct monitor just recheck all workspaces
-            if ws then
-                local active_monitor = hl.get_active_monitor()
-                if active_monitor then
-                    local range = MonitorRange:new(active_monitor)
-                    if ws.monitor.id ~= active_monitor.id and range:contains(ws.id) then
-                        log("workspace exists but is on the wrong monitor")
-                        hyprsplit.ensure_good_workspaces()
+            if ws and active_monitor then
+                local range = MonitorRange:new(active_monitor)
+                if ws.monitor.id ~= active_monitor.id and range:contains(ws.id) then
+                    log("workspace exists but is on the wrong monitor")
+                    hyprsplit.ensure_good_workspaces()
+                    active_monitor = hl.get_active_monitor()
+                end
+            end
+
+            if active_monitor and active_monitor.active_workspace then
+                local current = active_monitor.active_workspace.id
+                local target = math.tointeger(ws_string)
+                local bf = hl.get_config("binds.workspace_back_and_forth")
+                if bf and target == current then
+                    local prev = hyprsplit.prev_workspaces[active_monitor.name]
+                    if prev and prev ~= current then
+                        log("back_and_forth: switching to prev workspace %d", prev)
+                        ws_string = tostring(prev)
+                        target = prev
                     end
+                end
+                if target ~= current then
+                    hyprsplit.prev_workspaces[active_monitor.name] = current
                 end
             end
 
@@ -435,6 +453,7 @@ function hyprsplit.monitor_priority(priority)
 end
 
 hl.on("config.reloaded", function()
+    hyprsplit.prev_workspaces = {}
     hyprsplit.ensure_good_workspaces()
 end)
 
@@ -455,6 +474,7 @@ hl.on("monitor.added", function(monitor)
 end)
 
 hl.on("monitor.removed", function(monitor)
+    hyprsplit.prev_workspaces[monitor.name] = nil
     if hyprsplit._config.persistent_workspaces then
         local range = MonitorRange:new(monitor)
         for i = range.min, range.max do
