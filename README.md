@@ -16,6 +16,35 @@ Clone the repo somewhere, the easiest spot might be in your `.config/hypr` direc
 local hs = require("hyprsplit") -- you might have to change this depending on where "hyprsplit/init.lua" is located
 ```
 
+### Home-manager
+
+The following snippet of code tries to show how to bring the hyprsplit flake from the flake input.
+
+```nix
+inputs = {
+  nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+  hyprsplit.url = "github:shezdy/hyprsplit";
+  ;
+}
+```
+
+Then, create a symlink to `.config/hypr/hyprsplit`.
+
+```nix
+xdg.configFile = {
+  "hypr/hyprsplit" = {
+    source = "${hyprsplit.hyprsplitlua}/share/hyprsplit";
+    recursive = true;
+  };
+};
+```
+
+Finally, use it directly in Lua.
+
+```lua
+local hs = require("hyprsplit")
+```
+
 ## Usage
 > [!NOTE]
 > The lua library is new, you might run into bugs.
