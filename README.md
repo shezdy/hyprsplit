@@ -28,21 +28,26 @@ inputs = {
 }
 ```
 
-Then, create a symlink to `.config/hypr/hyprsplit`.
+Then, use it in hyprland.
 
 ```nix
-xdg.configFile = {
-  "hypr/hyprsplit" = {
-    source = "${hyprsplit.hyprsplitlua}/share/hyprsplit";
-    recursive = true;
+wayland.windowManager.hyprland = {
+  extraLuaFiles = {
+    # create a symlink to `.config/hypr/hyprsplit/init.lua`.
+    "hyprsplit/init" = {
+      autoLoad = false;
+      content = builtins.readFile "${hyprsplit.hyprsplitlua}/share/hyprsplit/init.lua";
+    };
+    # Finally, use it directly in Lua.
+    "hyprload" = {
+      autoLoad = true;
+      content = ''
+          local hs = require("hyprsplit")
+          -- your code
+        '';
+    };
   };
 };
-```
-
-Finally, use it directly in Lua.
-
-```lua
-local hs = require("hyprsplit")
 ```
 
 ## Usage
