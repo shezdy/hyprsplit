@@ -480,4 +480,33 @@ hl.on("monitor.removed", function(monitor)
     end
 end)
 
+hl.on("workspace.created", function(workspace)
+    if workspace == nil or workspace.special then
+        return
+    end
+
+    local monitor = workspace.monitor
+    if monitor == nil then
+        return
+    end
+
+    local range = MonitorRange:new(monitor)
+    if range.base < 0 or range:contains(workspace.id) then
+        return
+    end
+
+    local ws_id = workspace.id
+    local target = ws_id > range.max and range.max or range.min
+
+    hl.timer(function()
+        local ws = hl.get_workspace(ws_id)
+        if ws == nil or ws.windows > 0 then
+            return
+        end
+
+        log("reverting out-of-bounds workspace %d created by swipe, focusing %d", ws_id, target)
+        hl.dispatch(hl.dsp.focus({ workspace = target, on_current_monitor = true }))
+    end, { timeout = 1, type = "oneshot" })
+end)
+
 return hyprsplit
