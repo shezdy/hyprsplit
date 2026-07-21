@@ -14,6 +14,6 @@ inline constexpr auto CRIT  = Log::CRIT;
 
 template <typename... Args>
 void hsLog(eLogLevel level, std::format_string<Args...> fmt, Args&&... args) {
-	auto msg = std::vformat(fmt.get(), std::make_format_args(args...));
-	Log::logger->log(level, "[hyprsplit] {}", msg);
+    auto msg = std::vformat(fmt.get(), std::make_format_args(args...));
+    Log::logger->log(level, "[hyprsplit] {}", msg);
 }
