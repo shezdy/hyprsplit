@@ -56,8 +56,8 @@ function MonitorRange:new(monitor)
                     local mapped = false
                     for _, monitor_selector in ipairs(hyprsplit.monitor_priority_list) do
                         if
-                            monitor.name == monitor_selector
-                            or monitor.description == monitor_selector
+                            m.name == monitor_selector
+                            or m.description == monitor_selector
                         then
                             mapped = true
                             break
